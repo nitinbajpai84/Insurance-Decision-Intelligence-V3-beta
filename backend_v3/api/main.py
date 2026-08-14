@@ -34,17 +34,36 @@ def health():
     from backend_v3.graph_store.neo4j_client import health_check as neo4j_health
     from backend_v3.vector_store.qdrant_client import health_check as qdrant_health
 
+    try:
+        from backend_v3.structured_store.duckdb_client import get_connection
+
+        con = get_connection()
+        table_count = con.execute(
+            "select count(*) from information_schema.tables where table_schema='main'"
+        ).fetchone()[0]
+        con.close()
+        duckdb_status = {"status": "ok", "table_count": table_count}
+    except Exception as exc:
+        duckdb_status = {"status": "error", "detail": f"{type(exc).__name__}: {exc}"}
+
     return {
         "service": "meridian-v3-beta",
+        "duckdb": duckdb_status,
         "neo4j": neo4j_health(),
         "qdrant": qdrant_health(),
         "gemini": {"api_key_present": bool(GEMINI_API_KEY)},
     }
 
 
-try:
-    from backend_v3.api.ingestion_routes import router as ingestion_router
+for module_name, attr in [
+    ("backend_v3.api.ingestion_routes", "router"),
+    ("backend_v3.api.claims_routes", "router"),
+    ("backend_v3.api.graph_routes", "router"),
+]:
+    try:
+        import importlib
 
-    app.include_router(ingestion_router, prefix="/api/v3")
-except Exception as exc:  # pragma: no cover — surfaced via /api/v3/health instead of a hard crash
-    print(f"[main] ingestion_routes not loaded: {type(exc).__name__}: {exc}", file=sys.stderr)
+        mod = importlib.import_module(module_name)
+        app.include_router(getattr(mod, attr), prefix="/api/v3")
+    except Exception as exc:  # pragma: no cover — surfaced via /api/v3/health instead of a hard crash
+        print(f"[main] {module_name} not loaded: {type(exc).__name__}: {exc}", file=sys.stderr)
