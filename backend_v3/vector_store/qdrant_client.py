@@ -29,8 +29,8 @@ def get_client():
     return _client
 
 
-def ensure_collection(name: str, vector_size: int = VECTOR_SIZE) -> None:
-    from qdrant_client.models import Distance, VectorParams
+def ensure_collection(name: str, vector_size: int = VECTOR_SIZE, indexed_fields: tuple[str, ...] = ("customer_id", "claim_id")) -> None:
+    from qdrant_client.models import Distance, PayloadSchemaType, VectorParams
 
     client = get_client()
     existing = {c.name for c in client.get_collections().collections}
@@ -39,6 +39,16 @@ def ensure_collection(name: str, vector_size: int = VECTOR_SIZE) -> None:
             collection_name=name,
             vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
         )
+    # Qdrant requires a payload index before a field can be used in a query
+    # filter — create the common id fields up front so callers don't hit a
+    # 400 the first time they filter a fresh (or pre-existing) collection.
+    existing_indexes = set(client.get_collection(name).payload_schema.keys())
+    for field in indexed_fields:
+        if field not in existing_indexes:
+            try:
+                client.create_payload_index(name, field_name=field, field_schema=PayloadSchemaType.KEYWORD)
+            except Exception:
+                pass
 
 
 def upsert_points(collection: str, points: list[dict[str, Any]]) -> None:
