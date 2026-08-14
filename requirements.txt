@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+python-multipart
+neo4j
+qdrant-client
+google-genai
+duckdb
