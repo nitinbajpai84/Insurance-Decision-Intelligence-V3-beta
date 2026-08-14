@@ -1,0 +1,28 @@
+# Meridian V3 (beta) backend — Cloud Run image.
+#
+# Build from the PROJECT ROOT so it can pick up database/ as build context:
+#   docker build -f Dockerfile.backend -t <tag> .
+#
+# database/insurance_v3.duckdb is gitignored (too large) but baked into
+# this image via local COPY — build from a machine that has it locally.
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY backend_v3/ ./backend_v3/
+COPY database/ ./database/
+
+ENV DUCKDB_PATH=/app/database/insurance_v3.duckdb
+ENV PYTHONUNBUFFERED=1
+ENV PORT=3011
+EXPOSE 3011
+
+CMD ["sh", "-c", "uvicorn backend_v3.api.main:app --host 0.0.0.0 --port ${PORT}"]
