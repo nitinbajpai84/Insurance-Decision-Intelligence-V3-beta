@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { use, useState } from "react";
-import { AlertTriangle, ArrowLeft, Check, FileText, Loader2, Pencil, Sparkles, X } from "lucide-react";
+import { use, useRef, useState } from "react";
+import { AlertTriangle, ArrowLeft, Check, FileText, FileUp, Loader2, Pencil, Sparkles, X } from "lucide-react";
 import { advisorApi, type IngestConversationResult, type ProposedMemory } from "@/services/advisorApi";
 
 const TYPE_LABEL: Record<string, string> = {
@@ -19,6 +19,19 @@ export default function NewConversationPage({ params }: { params: Promise<{ cust
   const [memories, setMemories] = useState<ProposedMemory[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [fileName, setFileName] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function onFileSelected(file: File) {
+    setError("");
+    if (!file.name.toLowerCase().endsWith(".txt")) {
+      setError("Only .txt transcript files are supported right now.");
+      return;
+    }
+    const text = await file.text();
+    setTranscript(text);
+    setFileName(file.name);
+  }
 
   async function submit() {
     setProcessing(true);
@@ -58,10 +71,27 @@ export default function NewConversationPage({ params }: { params: Promise<{ cust
 
       {!result && (
         <section className="rounded-xl border border-gray-100 bg-white p-5 shadow-card">
+          <div className="mb-3 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-bold text-gray-700 hover:border-v3-violet hover:text-v3-violet"
+            >
+              <FileUp size={14} /> Upload .txt file
+            </button>
+            {fileName && <span className="text-xs text-gray-500">Loaded: {fileName}</span>}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".txt,text/plain"
+              className="hidden"
+              onChange={(e) => e.target.files?.[0] && onFileSelected(e.target.files[0])}
+            />
+          </div>
           <textarea
             value={transcript}
             onChange={(e) => setTranscript(e.target.value)}
-            placeholder="Paste the meeting transcript here…"
+            placeholder="Paste the meeting transcript here, or upload a .txt file above…"
             rows={14}
             className="w-full rounded-lg border border-gray-200 p-3 text-sm outline-none focus:border-v3-violet focus:ring-2 focus:ring-v3-violet/20"
           />

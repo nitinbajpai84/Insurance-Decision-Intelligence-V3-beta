@@ -45,6 +45,7 @@ export interface Customer360 extends CustomerListItem {
   discussed_topics: { topic: string; source: string; confidence: number }[];
   portfolio: { policy_id: string; product_name: string; line_of_business: string; annual_premium: number; policy_status: string }[];
   relevant_conversations: { text: string; score: number; confidence: number }[];
+  claims: { claim_id: string; claim_number: string; claim_status: string; loss_date: string; report_date: string; loss_cause: string; paid_amount: number; reserve_amount: number }[];
 }
 
 export interface Briefing {

@@ -139,6 +139,28 @@ def get_portfolio(customer_id: str, policy_ids: list[str]) -> list[dict[str, Any
         con.close()
 
 
+def get_claims_for_customer(customer_id: str) -> list[dict[str, Any]]:
+    """Stitches the Claims module into the advisor view — a customer's
+    claims history, straight from DuckDB (same table the standalone Claims
+    pages read), so an advisor sees the full relationship in one place
+    instead of two disconnected modules."""
+    from backend_v3.structured_store.duckdb_client import get_connection
+
+    con = get_connection()
+    try:
+        rows = con.execute(
+            "select claim_id, claim_number, claim_status, loss_date, report_date, "
+            "loss_cause, paid_amount, reserve_amount "
+            "from claims where customer_id = ? order by report_date desc",
+            [customer_id],
+        ).fetchall()
+        cols = ["claim_id", "claim_number", "claim_status", "loss_date", "report_date",
+                "loss_cause", "paid_amount", "reserve_amount"]
+        return [dict(zip(cols, r)) for r in rows]
+    finally:
+        con.close()
+
+
 def get_relevant_conversations(customer_id: str, query_text: str | None = None, limit: int = 5) -> list[dict[str, Any]]:
     """Semantically relevant past conversation notes from Qdrant.
 
@@ -179,4 +201,5 @@ def assemble_customer_context(customer_id: str) -> dict[str, Any] | None:
         return None
     portfolio = get_portfolio(customer_id, graph["owned_policy_ids"])
     conversations = get_relevant_conversations(customer_id)
-    return {**graph, "portfolio": portfolio, "relevant_conversations": conversations}
+    claims = get_claims_for_customer(customer_id)
+    return {**graph, "portfolio": portfolio, "relevant_conversations": conversations, "claims": claims}

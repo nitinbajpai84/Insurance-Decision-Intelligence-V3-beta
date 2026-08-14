@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
-import { AlertTriangle, ArrowRight, Clock, Sparkles, Upload, Users } from "lucide-react";
+import { AlertTriangle, ArrowRight, Clock, FileText, Sparkles, Upload, Users } from "lucide-react";
 import { advisorApi, money, type Customer360 } from "@/services/advisorApi";
 
 const PRIORITY_LABEL: Record<string, string> = { high: "🔴 High priority", medium: "🟠 Medium priority", low: "⚪ Low priority" };
@@ -103,6 +103,42 @@ export default function CustomerProfilePage({ params }: { params: Promise<{ cust
             </tbody>
           </table>
         </div>
+      </Card>
+
+      {/* Claims — stitched in from the Claims Intelligence module */}
+      <Card title={`Claims (${customer.claims.length})`} icon={<FileText size={16} className="text-v3-teal" />}>
+        {customer.claims.length === 0 ? (
+          <p className="text-sm text-gray-400">No claims on file for this customer.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs font-bold uppercase tracking-wide text-gray-400">
+                <tr>
+                  <th className="py-1.5 pr-3">Claim</th>
+                  <th className="py-1.5 pr-3">Status</th>
+                  <th className="py-1.5 pr-3">Loss cause</th>
+                  <th className="py-1.5 pr-3">Reported</th>
+                  <th className="py-1.5 text-right">Paid</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {customer.claims.map((c) => (
+                  <tr key={c.claim_id}>
+                    <td className="py-1.5 pr-3">
+                      <Link href={`/claims/${c.claim_id}`} className="font-semibold text-v3-violet hover:underline">
+                        {c.claim_number}
+                      </Link>
+                    </td>
+                    <td className="py-1.5 pr-3 text-gray-600">{c.claim_status}</td>
+                    <td className="py-1.5 pr-3 text-gray-600">{c.loss_cause || "—"}</td>
+                    <td className="py-1.5 pr-3 text-gray-600">{c.report_date}</td>
+                    <td className="py-1.5 text-right font-semibold text-gray-900">{money(c.paid_amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
 
       {/* Recent events */}

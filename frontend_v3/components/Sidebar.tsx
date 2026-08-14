@@ -4,16 +4,38 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FileText, GitBranch, LayoutDashboard, Sparkles, Users } from "lucide-react";
 
-const NAV = [
-  { href: "/", label: "Overview", icon: LayoutDashboard },
-  { href: "/claims", label: "Claims", icon: FileText },
-  { href: "/context-graph", label: "Context Graph", icon: GitBranch }
+interface NavItem {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+}
+
+const SECTIONS: { title: string | null; items: NavItem[] }[] = [
+  {
+    title: null,
+    items: [
+      { href: "/", label: "Overview", icon: LayoutDashboard },
+      { href: "/context-graph", label: "Context Graph", icon: GitBranch }
+    ]
+  },
+  {
+    title: "Claims intelligence",
+    items: [{ href: "/claims", label: "Claims", icon: FileText }]
+  },
+  {
+    title: "Advisor intelligence",
+    items: [
+      { href: "/advisor", label: "Agent Home", icon: LayoutDashboard },
+      { href: "/advisor/customers", label: "Customers", icon: Users }
+    ]
+  }
 ];
 
-const ADVISOR_NAV = [
-  { href: "/advisor", label: "Agent Home", icon: LayoutDashboard },
-  { href: "/advisor/customers", label: "Customers", icon: Users }
-];
+function isActive(pathname: string, href: string): boolean {
+  if (href === "/") return pathname === "/";
+  if (href === "/advisor") return pathname === "/advisor";
+  return pathname.startsWith(href);
+}
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -33,43 +55,30 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-5 thin-scroll">
-        <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500">Claims intelligence</p>
-        {NAV.map((item) => {
-          const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={active ? "page" : undefined}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${
-                active ? "bg-v3-violet text-white" : "text-gray-300 hover:bg-white/10 hover:text-white"
-              }`}
-            >
-              <Icon size={18} />
-              {item.label}
-            </Link>
-          );
-        })}
-
-        <p className="px-3 pb-1 pt-4 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500">Advisor intelligence</p>
-        {ADVISOR_NAV.map((item) => {
-          const active = pathname === item.href || (item.href !== "/advisor" && pathname.startsWith(item.href));
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={active ? "page" : undefined}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${
-                active ? "bg-v3-violet text-white" : "text-gray-300 hover:bg-white/10 hover:text-white"
-              }`}
-            >
-              <Icon size={18} />
-              {item.label}
-            </Link>
-          );
-        })}
+        {SECTIONS.map((section, i) => (
+          <div key={section.title || `section-${i}`} className={i > 0 ? "pt-4" : ""}>
+            {section.title && (
+              <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500">{section.title}</p>
+            )}
+            {section.items.map((item) => {
+              const active = isActive(pathname, item.href);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${
+                    active ? "bg-v3-violet text-white" : "text-gray-300 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  <Icon size={18} />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       <div className="border-t border-white/10 p-5">
