@@ -13,11 +13,15 @@ RECENT_EVENT_DAYS = 90
 STALE_CONTACT_DAYS = 180
 
 
-def _parse_date(s: str | None) -> date | None:
+def _parse_date(s) -> date | None:
+    """Neo4j can hand back either a plain string (how this codebase writes
+    dates everywhere) or, if a write path ever used Cypher's native date()
+    function instead, a neo4j.time.Date object -- str() on either yields an
+    ISO date string, so normalize defensively rather than assume a type."""
     if not s:
         return None
     try:
-        return date.fromisoformat(s)
+        return date.fromisoformat(str(s))
     except ValueError:
         return None
 

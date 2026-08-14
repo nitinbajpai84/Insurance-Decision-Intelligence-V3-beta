@@ -25,12 +25,18 @@ def test_get_customer_graph_returns_expected_shape_for_known_customer():
 
 
 def test_every_graph_fact_carries_source_and_confidence():
+    # Note: this customer's data may include both original seed facts
+    # (confidence 1.0) AND Milestone 2 approved-conversation facts (whatever
+    # confidence Gemini assigned at extraction time) if M2 tests or manual
+    # testing ran against this same live customer -- so this checks the
+    # provenance CONTRACT (every fact is sourced and has a valid confidence),
+    # not a specific value.
     graph = get_customer_graph(KNOWN_CUSTOMER_ID)
     for section in ("family", "goals", "needs", "life_events", "meetings", "concerns", "discussed_topics"):
         for item in graph[section]:
-            assert "source" in item, f"{section} item missing source: {item}"
+            assert "source" in item and item["source"], f"{section} item missing source: {item}"
             assert "confidence" in item, f"{section} item missing confidence: {item}"
-            assert item["confidence"] == 1.0  # seed data is already-approved advisor memory
+            assert 0.0 <= item["confidence"] <= 1.0, f"{section} item has out-of-range confidence: {item}"
 
 
 def test_assemble_customer_context_joins_portfolio_from_duckdb():

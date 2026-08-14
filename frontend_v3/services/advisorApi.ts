@@ -69,9 +69,71 @@ export interface Briefing {
   gemini_error: string | null;
 }
 
+export interface ProposedMemory {
+  memory_id: string;
+  customer_id: string;
+  memory_type: "life_event" | "goal" | "need" | "concern" | "preference" | "objection" | "commitment" | "follow_up";
+  value: string;
+  category: string | null;
+  evidence: string;
+  confidence: number;
+  status: "pending" | "accepted" | "rejected" | "edited";
+  has_conflict: boolean;
+  conflict_with: string | null;
+}
+
+export interface IngestConversationResult {
+  conversation_id: string;
+  customer_id: string;
+  summary: string;
+  chunks_stored: number;
+  proposed_memories: ProposedMemory[];
+}
+
+export interface ConversationRecord {
+  conversation_id: string;
+  date: string;
+  summary: string;
+  transcript_excerpt: string;
+}
+
+export interface MemoryTimelineEntry {
+  memory_id: string;
+  memory_type: string;
+  value: string;
+  status: string;
+  confidence: number;
+  created_at: string;
+  last_verified_at: string;
+  source: string;
+}
+
+async function postRaw<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new Error(errBody.detail || `POST ${path} -> HTTP ${res.status}`);
+  }
+  return (await res.json()) as T;
+}
+
 export const advisorApi = {
   listCustomers: () => getJSON<CustomerListItem[]>("/api/v3/advisor/customers"),
   getCustomer: (customerId: string) => getJSON<Customer360>(`/api/v3/advisor/customers/${encodeURIComponent(customerId)}`),
+  uploadConversation: (customerId: string, transcript: string) =>
+    postRaw<IngestConversationResult>(`/api/v3/advisor/customers/${encodeURIComponent(customerId)}/conversations`, { transcript }),
+  listConversations: (customerId: string) => getJSON<ConversationRecord[]>(`/api/v3/advisor/customers/${encodeURIComponent(customerId)}/conversations`),
+  listPendingMemories: (customerId: string, status = "pending") =>
+    getJSON<ProposedMemory[]>(`/api/v3/advisor/customers/${encodeURIComponent(customerId)}/pending-memories?status=${status}`),
+  getMemoryTimeline: (customerId: string) => getJSON<MemoryTimelineEntry[]>(`/api/v3/advisor/customers/${encodeURIComponent(customerId)}/memory-timeline`),
+  approveMemory: (memoryId: string, editedValue?: string) =>
+    postRaw<{ memory_id: string; status: string; value: string; promoted: boolean }>(`/api/v3/advisor/memories/${encodeURIComponent(memoryId)}/approve`, { edited_value: editedValue || null }),
+  rejectMemory: (memoryId: string) =>
+    postRaw<{ memory_id: string; status: string }>(`/api/v3/advisor/memories/${encodeURIComponent(memoryId)}/reject`, {}),
   prepareMeeting: (customerId: string) => postJSON<Briefing>(`/api/v3/advisor/customers/${encodeURIComponent(customerId)}/briefing`),
 };
 

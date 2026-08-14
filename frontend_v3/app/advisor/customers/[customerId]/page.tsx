@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
-import { AlertTriangle, ArrowRight, Sparkles, Users } from "lucide-react";
+import { AlertTriangle, ArrowRight, Clock, Sparkles, Upload, Users } from "lucide-react";
 import { advisorApi, money, type Customer360 } from "@/services/advisorApi";
 
 const PRIORITY_LABEL: Record<string, string> = { high: "🔴 High priority", medium: "🟠 Medium priority", low: "⚪ Low priority" };
@@ -30,12 +30,26 @@ export default function CustomerProfilePage({ params }: { params: Promise<{ cust
               {customer.life_stage} · {PRIORITY_LABEL[customer.priority]} · Last contact: {customer.last_contact_date || "—"}
             </p>
           </div>
-          <Link
-            href={`/advisor/customers/${customerId}/briefing`}
-            className="inline-flex items-center gap-2 rounded-lg bg-v3-violet px-4 py-2.5 text-sm font-bold text-white shadow-glow hover:bg-v3-violetDark"
-          >
-            <Sparkles size={16} /> Prepare for Meeting <ArrowRight size={16} />
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={`/advisor/customers/${customerId}/conversations/new`}
+              className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2.5 text-sm font-bold text-white hover:bg-white/20"
+            >
+              <Upload size={16} /> Upload Conversation
+            </Link>
+            <Link
+              href={`/advisor/customers/${customerId}/memory`}
+              className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2.5 text-sm font-bold text-white hover:bg-white/20"
+            >
+              <Clock size={16} /> Memory Timeline
+            </Link>
+            <Link
+              href={`/advisor/customers/${customerId}/briefing`}
+              className="inline-flex items-center gap-2 rounded-lg bg-v3-violet px-4 py-2.5 text-sm font-bold text-white shadow-glow hover:bg-v3-violetDark"
+            >
+              <Sparkles size={16} /> Prepare for Meeting <ArrowRight size={16} />
+            </Link>
+          </div>
         </div>
       </section>
 
