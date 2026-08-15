@@ -130,12 +130,18 @@ def upsert_contact(contact: NormalizedContact) -> dict[str, Any]:
     if not customer_id:
         return {"written": False, "reason": "customer_not_found"}
 
+    # Must match synthetic_data.py's seed pattern exactly (:FamilyMember
+    # label, :HAS_FAMILY_MEMBER relationship, relationship type stored on
+    # the node) — retrieval.get_customer_graph() reads that exact shape,
+    # so drifting from it here would make imported family silently
+    # invisible in Customer 360 despite a successful-looking import.
     run_write(
         "MATCH (c:Customer {customer_id: $customer_id}) "
-        "MERGE (p:Person {name: $name, customer_id: $customer_id}) "
-        "SET p.email = coalesce($email, p.email), p.phone = coalesce($phone, p.phone) "
-        "MERGE (c)-[r:FAMILY_MEMBER]->(p) "
-        "SET r.relationship = $relationship, r.source = $source, r.confidence = 1.0, "
+        "MERGE (f:FamilyMember {name: $name, customer_id: $customer_id}) "
+        "SET f.relationship = $relationship, f.email = coalesce($email, f.email), "
+        "    f.phone = coalesce($phone, f.phone) "
+        "MERGE (c)-[r:HAS_FAMILY_MEMBER]->(f) "
+        "SET r.source = $source, r.confidence = 1.0, "
         "    r.created_at = $now, r.source_system = $source_system, r.source_id = $source_id, "
         "    r.original_reference = $original_reference, r.imported_at = $imported_at",
         {
@@ -159,13 +165,17 @@ def upsert_policy(policy: NormalizedPolicy) -> dict[str, Any]:
     if not customer_id:
         return {"written": False, "reason": "customer_not_found"}
 
+    # Must match synthetic_data.py's :OWNS relationship — retrieval.py's
+    # get_portfolio() only discovers a policy_id by traversing OWNS, so a
+    # different relationship type here would make an imported policy
+    # invisible in Customer 360 despite writing real data.
     run_write(
         "MATCH (c:Customer {customer_id: $customer_id}) "
         "MERGE (p:Policy {policy_id: $policy_id}) "
         "SET p.product_name = $product_name, p.line_of_business = $line_of_business, "
         "    p.annual_premium = $annual_premium, p.policy_status = $policy_status, "
         "    p.customer_id = $customer_id "
-        "MERGE (c)-[r:HOLDS_POLICY]->(p) "
+        "MERGE (c)-[r:OWNS]->(p) "
         "SET r.source = $source, r.confidence = 1.0, r.created_at = $now, "
         "    r.source_system = $source_system, r.source_id = $source_id, "
         "    r.original_reference = $original_reference, r.imported_at = $imported_at",

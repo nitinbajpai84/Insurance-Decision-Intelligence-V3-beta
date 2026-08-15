@@ -2,8 +2,23 @@
 
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
-import { AlertTriangle, ArrowRight, Brain, CalendarClock, Clock, FileText, History, ShieldCheck, Sparkles, Upload, Users } from "lucide-react";
-import { advisorApi, money, type Customer360 } from "@/services/advisorApi";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Brain,
+  CalendarClock,
+  Check,
+  Clock,
+  FileText,
+  GitBranch,
+  History,
+  ShieldCheck,
+  Sparkles,
+  Upload,
+  Users,
+  X
+} from "lucide-react";
+import { advisorApi, intelligenceApi, money, type Customer360, type CustomerPriority, type KnowledgeCoverage, type MemoryFreshness, type NextBestActionItem } from "@/services/advisorApi";
 
 const PRIORITY_TONE: Record<string, string> = {
   high: "bg-v3-rose/10 text-v3-rose",
@@ -14,11 +29,40 @@ const PRIORITY_TONE: Record<string, string> = {
 export default function CustomerProfilePage({ params }: { params: Promise<{ customerId: string }> }) {
   const { customerId } = use(params);
   const [customer, setCustomer] = useState<Customer360 | null>(null);
+  const [priority, setPriority] = useState<CustomerPriority | null>(null);
+  const [coverage, setCoverage] = useState<KnowledgeCoverage | null>(null);
+  const [freshness, setFreshness] = useState<MemoryFreshness | null>(null);
+  const [actions, setActions] = useState<NextBestActionItem[] | null>(null);
+  const [actionsError, setActionsError] = useState("");
+  const [generatingActions, setGeneratingActions] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     advisorApi.getCustomer(customerId).then(setCustomer).catch((e) => setError(e.message));
+    intelligenceApi.getPriority(customerId).then(setPriority).catch(() => {});
+    intelligenceApi.getKnowledgeCoverage(customerId).then(setCoverage).catch(() => {});
+    intelligenceApi.getMemoryFreshness(customerId).then(setFreshness).catch(() => {});
+    intelligenceApi.listNextBestActions(customerId, "pending").then(setActions).catch(() => {});
   }, [customerId]);
+
+  async function generateActions() {
+    setGeneratingActions(true);
+    setActionsError("");
+    try {
+      const result = await intelligenceApi.generateNextBestActions(customerId);
+      setActions(result.actions.filter((a) => a.status === "pending"));
+      if (result.gemini_error) setActionsError(result.gemini_error);
+    } catch (e) {
+      setActionsError((e as Error).message);
+    } finally {
+      setGeneratingActions(false);
+    }
+  }
+
+  async function decide(action: NextBestActionItem, accept: boolean) {
+    await intelligenceApi.decideAction(action.proposal_id, accept);
+    setActions((prev) => (prev || []).filter((a) => a.proposal_id !== action.proposal_id));
+  }
 
   if (error) return <div className="p-8 text-sm text-v3-rose">{error}</div>;
   if (!customer) return <div className="p-8 text-sm text-gray-400">Loading...</div>;
@@ -43,6 +87,9 @@ export default function CustomerProfilePage({ params }: { params: Promise<{ cust
             </Link>
             <Link href={`/advisor/customers/${customerId}/meeting-history`} className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2.5 text-sm font-bold text-white hover:bg-white/20">
               <History size={16} /> Meeting History
+            </Link>
+            <Link href={`/advisor/customers/${customerId}/knowledge-graph`} className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2.5 text-sm font-bold text-white hover:bg-white/20">
+              <GitBranch size={16} /> Knowledge Graph
             </Link>
             <Link href={`/advisor/customers/${customerId}/briefing`} className="inline-flex items-center gap-2 rounded-lg bg-v3-violet px-4 py-2.5 text-sm font-bold text-white shadow-glow hover:bg-v3-violetDark">
               <Sparkles size={16} /> Prepare for Meeting <ArrowRight size={16} />
@@ -80,13 +127,113 @@ export default function CustomerProfilePage({ params }: { params: Promise<{ cust
             <h2 className="text-base font-bold text-gray-900">AI Insights</h2>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <Insight label="Priority" value={customer.priority} tone={PRIORITY_TONE[customer.priority]} />
+            <Insight
+              label="Priority"
+              value={priority ? `${priority.priority} · ${priority.score}` : customer.priority}
+              tone={PRIORITY_TONE[priority?.priority || customer.priority]}
+            />
             <Insight label="Information freshness" value={customer.is_stale ? "Stale" : "Current"} tone={customer.is_stale ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700"} />
             <Insight label="Recent event" value={customer.most_recent_life_event_days_ago === null ? "None" : `${customer.most_recent_life_event_days_ago} days ago`} tone="bg-gray-100 text-gray-600" />
           </div>
+
+          {priority && priority.reasons.length > 0 && (
+            <div className="mt-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-gray-400">Why this priority — never a black box</p>
+              <ul className="mt-2 space-y-1">
+                {priority.reasons.map((r) => (
+                  <li key={r.label} className="flex items-start justify-between gap-2 text-xs text-gray-700">
+                    <span>• {r.label}</span>
+                    <span className="shrink-0 text-gray-400">+{r.weight}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {coverage && (
+            <div className="mt-4 border-t border-gray-100 pt-4">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold uppercase tracking-wide text-gray-400">Knowledge Coverage</p>
+                <span className="text-sm font-bold text-v3-violet">{coverage.coverage_percent}%</span>
+              </div>
+              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-gray-100">
+                <div className="h-full bg-v3-teal" style={{ width: `${coverage.coverage_percent}%` }} />
+              </div>
+              {coverage.missing_categories.length > 0 && (
+                <p className="mt-1.5 text-xs text-gray-500">Missing: {coverage.missing_categories.join(", ")}</p>
+              )}
+            </div>
+          )}
+
+          {freshness && freshness.discovery_questions.length > 0 && (
+            <div className="mt-4 border-t border-gray-100 pt-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-gray-400">
+                Memory freshness — {freshness.stale_count} stale, {freshness.current_count} current
+              </p>
+              <p className="mt-1 text-xs text-gray-500">Discovery questions rather than assumptions:</p>
+              <ul className="mt-1 space-y-1">
+                {freshness.discovery_questions.slice(0, 3).map((q) => (
+                  <li key={q} className="text-xs italic text-amber-700">{q}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <p className="mt-4 text-xs leading-5 text-gray-500">Insights are derived from graph facts and conversation memory. AI-synthesized suggestions appear in meeting preparation and cite their evidence.</p>
         </section>
       </div>
+
+      <section className="rounded-lg border border-gray-100 bg-white p-5 shadow-card">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Sparkles size={16} className="text-v3-violet" />
+            <h2 className="text-base font-bold text-gray-900">Next Best Action</h2>
+          </div>
+          <button
+            onClick={generateActions}
+            disabled={generatingActions}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-bold text-gray-700 hover:border-v3-violet hover:text-v3-violet disabled:opacity-50"
+          >
+            {generatingActions ? "Generating..." : "Generate suggestions"}
+          </button>
+        </div>
+        <p className="mt-1 text-xs text-gray-500">
+          Potential discussion areas grounded in this customer&apos;s record — never a product recommendation. You
+          decide what happens next.
+        </p>
+        {actionsError && <p className="mt-2 text-xs text-v3-rose">{actionsError}</p>}
+        <div className="mt-3 space-y-2">
+          {(actions || []).map((action) => (
+            <div key={action.proposal_id} className="rounded-lg border border-gray-100 p-3">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-semibold text-gray-900">{action.action}</p>
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${PRIORITY_TONE[action.urgency]}`}>
+                  {action.urgency}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-gray-600">{action.why}</p>
+              <p className="mt-1 text-xs italic text-gray-400">Based on: {action.based_on}</p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={() => decide(action, true)}
+                  className="inline-flex items-center gap-1 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-green-700"
+                >
+                  <Check size={12} /> Accept
+                </button>
+                <button
+                  onClick={() => decide(action, false)}
+                  className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                >
+                  <X size={12} /> Reject
+                </button>
+              </div>
+            </div>
+          ))}
+          {actions && actions.length === 0 && !actionsError && (
+            <p className="text-sm text-gray-400">No pending suggestions — generate some from this customer&apos;s current record.</p>
+          )}
+        </div>
+      </section>
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Card title="Goals">

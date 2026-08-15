@@ -3,14 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BarChart3,
   CalendarDays,
   CheckSquare,
   FileText,
   GitBranch,
   LayoutDashboard,
+  Lightbulb,
   Link2,
   MessageSquareText,
   Settings,
+  ShieldCheck,
   Sparkles,
   Users
 } from "lucide-react";
@@ -26,10 +29,13 @@ const SECTIONS: { title: string | null; items: NavItem[] }[] = [
     title: "Advisor workspace",
     items: [
       { href: "/advisor", label: "My Day", icon: CalendarDays },
+      { href: "/advisor/insights", label: "Insights", icon: Lightbulb },
       { href: "/advisor/customers", label: "Customers", icon: Users },
       { href: "/advisor/conversations", label: "Conversations", icon: MessageSquareText },
       { href: "/advisor/tasks", label: "Tasks", icon: CheckSquare },
       { href: "/advisor/connections", label: "Connections", icon: Link2 },
+      { href: "/advisor/kpis", label: "KPI Dashboard", icon: BarChart3 },
+      { href: "/advisor/audit", label: "AI Auditability", icon: ShieldCheck },
       { href: "/advisor/settings", label: "Profile / Settings", icon: Settings }
     ]
   },

@@ -66,6 +66,7 @@ for module_name, attr in [
     ("backend_v3.api.account_routes", "router"),
     ("backend_v3.api.followup_routes", "router"),
     ("backend_v3.api.meeting_history_routes", "router"),
+    ("backend_v3.api.intelligence_routes", "router"),
 ]:
     try:
         import importlib

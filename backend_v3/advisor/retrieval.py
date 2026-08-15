@@ -111,8 +111,14 @@ def get_customer_graph(customer_id: str) -> dict[str, Any] | None:
 
 
 def get_portfolio(customer_id: str, policy_ids: list[str]) -> list[dict[str, Any]]:
-    """Authoritative policy figures from DuckDB for the policies Neo4j says
-    this customer owns — premium/status are facts DuckDB owns, not Neo4j."""
+    """Policy figures for everything Neo4j says this customer owns.
+
+    DuckDB is authoritative where it has a row (the seeded policy
+    system). A CSV-imported policy has no DuckDB counterpart, so it
+    falls back to the figures stored on the Neo4j Policy node itself —
+    without this, an import that reports success would silently produce
+    a portfolio section with nothing in it.
+    """
     if not policy_ids:
         return []
     from backend_v3.structured_store.duckdb_client import get_connection
@@ -127,16 +133,40 @@ def get_portfolio(customer_id: str, policy_ids: list[str]) -> list[dict[str, Any
             f"where pol.policy_id in ({ph})",
             policy_ids,
         ).fetchall()
-        return [
-            {
+        found = {
+            r[0]: {
                 "policy_id": r[0], "product_name": r[1], "line_of_business": r[2],
                 "annual_premium": r[3], "policy_status": r[4],
                 "source": "policy_system", "confidence": 1.0,
             }
             for r in rows
-        ]
+        }
     finally:
         con.close()
+
+    missing = [pid for pid in policy_ids if pid not in found]
+    if missing:
+        from backend_v3.graph_store.neo4j_client import run_query
+
+        graph_rows = run_query(
+            "MATCH (p:Policy) WHERE p.policy_id IN $ids "
+            "RETURN p.policy_id AS policy_id, p.product_name AS product_name, "
+            "p.line_of_business AS line_of_business, p.annual_premium AS annual_premium, "
+            "p.policy_status AS policy_status, p.source_system AS source_system",
+            {"ids": missing},
+        )
+        for row in graph_rows:
+            found[row["policy_id"]] = {
+                "policy_id": row["policy_id"],
+                "product_name": row["product_name"],
+                "line_of_business": row["line_of_business"],
+                "annual_premium": row["annual_premium"],
+                "policy_status": row["policy_status"],
+                "source": row.get("source_system") or "imported",
+                "confidence": 1.0,
+            }
+
+    return [found[pid] for pid in policy_ids if pid in found]
 
 
 def get_claims_for_customer(customer_id: str) -> list[dict[str, Any]]:

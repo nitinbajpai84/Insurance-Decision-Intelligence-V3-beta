@@ -498,3 +498,156 @@ export function money(v: number | null | undefined): string {
   if (v === null || v === undefined) return "—";
   return `S$${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 }
+
+// --------------------------------------------------------------------------
+// Stage 4: transparent priority, Next Best Action, coverage/freshness,
+// insights, knowledge graph, KPIs, AI auditability.
+// --------------------------------------------------------------------------
+
+export interface PriorityReason {
+  signal: string;
+  label: string;
+  weight: number;
+}
+
+export interface CustomerPriority {
+  customer_id: string;
+  name: string;
+  priority: "high" | "medium" | "low";
+  score: number;
+  reasons: PriorityReason[];
+  unresolved_needs_count: number;
+  open_concerns_count: number;
+  pending_followups_count: number;
+  days_since_contact: number | null;
+  is_stale: boolean;
+  conversation_count: number;
+}
+
+export interface NextBestActionItem {
+  proposal_id: string;
+  customer_id: string;
+  action: string;
+  why: string;
+  based_on: string;
+  urgency: "high" | "medium" | "low";
+  status: "pending" | "accepted" | "rejected";
+}
+
+export interface NextBestActionResult {
+  customer_id: string;
+  name: string;
+  actions: NextBestActionItem[];
+  gemini_error: string | null;
+}
+
+export interface CoverageCategory {
+  category: string;
+  present: boolean;
+  detail: string | null;
+}
+
+export interface KnowledgeCoverage {
+  customer_id: string;
+  name: string;
+  coverage_percent: number;
+  categories: CoverageCategory[];
+  missing_categories: string[];
+}
+
+export interface FreshnessEntry {
+  label: string;
+  category: string;
+  last_verified_at: string | null;
+  months_ago: number | null;
+  status: "current" | "stale" | "unknown";
+}
+
+export interface MemoryFreshness {
+  customer_id: string;
+  entries: FreshnessEntry[];
+  stale_count: number;
+  current_count: number;
+  discovery_questions: string[];
+}
+
+export interface KnowledgeGraphNode {
+  id: string;
+  type: string;
+  label: string;
+  value: unknown;
+  source: string | null;
+  confidence: number | null;
+  last_verified_at: string | null;
+}
+
+export interface KnowledgeGraphLink {
+  source: string;
+  target: string;
+  type: string;
+}
+
+export interface CustomerKnowledgeGraph {
+  customer_id: string;
+  nodes: KnowledgeGraphNode[];
+  links: KnowledgeGraphLink[];
+}
+
+export interface InsightsView {
+  customers_requiring_attention: CustomerListItem[];
+  new_life_events: { customer_id: string; customer_name: string; description: string; days_ago: number }[];
+  emerging_needs: PendingMemoryReview[];
+  unresolved_conversations: PendingMemoryReview[];
+  followup_opportunities: FollowUp[];
+  top_priority_customers: CustomerPriority[];
+  summary: Record<string, number>;
+}
+
+export interface KpiDashboard {
+  agent: Record<string, unknown>;
+  customer: Record<string, unknown>;
+  ai: Record<string, unknown>;
+  business: Record<string, unknown>;
+  guardrails: Record<string, unknown>;
+}
+
+export interface AiAuditRow {
+  kind: string;
+  customer_id: string;
+  customer_name: string;
+  agent: string | null;
+  record_id: string;
+  insight_type: string;
+  output: string;
+  source: string;
+  model: string;
+  confidence: number | null;
+  timestamp: string;
+  human_decision: string;
+}
+
+export const intelligenceApi = {
+  getPriority: (customerId: string) => getJSON<CustomerPriority>(`/api/v3/advisor/customers/${encodeURIComponent(customerId)}/priority`),
+  listAllPriority: () => getJSON<CustomerPriority[]>("/api/v3/advisor/priority"),
+  generateNextBestActions: (customerId: string) =>
+    postJSON<NextBestActionResult>(`/api/v3/advisor/customers/${encodeURIComponent(customerId)}/next-best-actions`),
+  listNextBestActions: (customerId: string, status?: string) =>
+    getJSON<NextBestActionItem[]>(
+      `/api/v3/advisor/customers/${encodeURIComponent(customerId)}/next-best-actions${status ? `?status=${status}` : ""}`
+    ),
+  decideAction: (proposalId: string, accept: boolean, dueDate?: string) =>
+    postRaw<{ proposal_id: string; status: string; followup_id: string | null }>(
+      `/api/v3/advisor/next-best-actions/${encodeURIComponent(proposalId)}/decide`,
+      { accept, due_date: dueDate ?? null }
+    ),
+  getKnowledgeCoverage: (customerId: string) =>
+    getJSON<KnowledgeCoverage>(`/api/v3/advisor/customers/${encodeURIComponent(customerId)}/knowledge-coverage`),
+  getMemoryFreshness: (customerId: string) =>
+    getJSON<MemoryFreshness>(`/api/v3/advisor/customers/${encodeURIComponent(customerId)}/memory-freshness`),
+  getKnowledgeGraph: (customerId: string) =>
+    getJSON<CustomerKnowledgeGraph>(`/api/v3/advisor/customers/${encodeURIComponent(customerId)}/knowledge-graph`),
+  getInsights: () => getJSON<InsightsView>("/api/v3/advisor/insights"),
+  getKpis: () => getJSON<KpiDashboard>("/api/v3/advisor/kpis"),
+  getAiAudit: (customerId?: string) =>
+    getJSON<AiAuditRow[]>(`/api/v3/advisor/ai-audit${customerId ? `?customer_id=${encodeURIComponent(customerId)}` : ""}`)
+};

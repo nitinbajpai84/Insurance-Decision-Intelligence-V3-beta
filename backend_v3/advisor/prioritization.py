@@ -58,6 +58,19 @@ def compute_priority(life_events: list[dict], concerns: list[dict], meetings: li
     else:
         priority = "low"
 
+    # Stage 4: "Always show WHY a customer is prioritized" — never an
+    # unexplained score. Built from the same signals the priority itself
+    # used, so the reasons can never disagree with the number.
+    reasons: list[str] = []
+    if is_recent_event and most_recent_event:
+        reasons.append(f"Recent life event: {most_recent_event['description']} ({most_recent_event_days}d ago)")
+    if is_stale:
+        reasons.append(f"No contact in {days_since_contact} days — information may be stale")
+    if concern_count:
+        reasons.append(f"{concern_count} open concern{'s' if concern_count != 1 else ''} raised")
+    if not reasons:
+        reasons.append("No urgent signals — routine priority")
+
     return {
         "priority": priority,
         "days_since_contact": days_since_contact,
@@ -66,4 +79,5 @@ def compute_priority(life_events: list[dict], concerns: list[dict], meetings: li
         "most_recent_life_event": most_recent_event["description"] if most_recent_event else None,
         "most_recent_life_event_days_ago": most_recent_event_days,
         "open_concerns_count": concern_count,
+        "priority_reasons": reasons,
     }

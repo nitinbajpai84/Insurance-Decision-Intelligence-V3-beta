@@ -52,6 +52,13 @@ def cleanup_stage2_artifacts():
         {"prefix": TEST_PREFIX},
     )
     run_write("MATCH (c:Connection {provider: $p}) DETACH DELETE c", {"p": TEST_PREFIX})
+    # Family members merge onto the real seeded customer (like the
+    # CustomerIdentity case above), so only their own name carries the
+    # test prefix.
+    run_write(
+        "MATCH (f:FamilyMember) WHERE f.name STARTS WITH $prefix DETACH DELETE f",
+        {"prefix": TEST_PREFIX},
+    )
 
 
 # --------------------------------------------------------------------------
@@ -244,6 +251,80 @@ def test_connection_center_exposes_every_stage2_category():
 # --------------------------------------------------------------------------
 # Provenance
 # --------------------------------------------------------------------------
+
+def test_imported_family_member_appears_in_customer_graph():
+    """upsert_contact's write shape must match synthetic_data.py's seed
+    pattern exactly (:FamilyMember / :HAS_FAMILY_MEMBER) — a mismatch
+    would make an imported family member disappear from Customer 360
+    despite the import itself reporting success."""
+    from backend_v3.advisor.customer_service import list_customer_summaries
+    from backend_v3.advisor.retrieval import get_customer_graph
+    from backend_v3.integrations.identity import register_identity
+    from backend_v3.integrations.models import NormalizedContact, Provenance
+    from backend_v3.integrations.pipeline import upsert_contact
+
+    customer_id = list_customer_summaries()[0]["customer_id"]
+    name = f"{TEST_PREFIX} spouse {uuid.uuid4()}"
+
+    # upsert_contact resolves customer_external_id through identity
+    # matching, same as any other source — give it a deterministic key
+    # rather than relying on the mangled-ID fallback.
+    register_identity(customer_id, "external_id", customer_id, TEST_PREFIX)
+
+    result = upsert_contact(
+        NormalizedContact(
+            customer_external_id=customer_id,
+            full_name=name,
+            relationship="spouse",
+            provenance=Provenance(TEST_PREFIX, name, "test"),
+        )
+    )
+    assert result["written"] is True
+
+    graph = get_customer_graph(customer_id)
+    assert any(f["name"] == name and f["relationship"] == "spouse" for f in graph["family"])
+
+
+def test_imported_policy_appears_in_customer_portfolio():
+    """Same class of bug as the family-member case above: upsert_policy
+    must write :OWNS (not a different relationship type) for
+    retrieval.get_portfolio() to ever discover the policy_id at all —
+    and even once discovered, a policy with no DuckDB row (every CSV
+    import) needs the Neo4j-node fallback or its premium/status would
+    still be silently blank."""
+    from backend_v3.advisor.retrieval import assemble_customer_context
+    from backend_v3.advisor.customer_service import list_customer_summaries
+    from backend_v3.integrations.identity import register_identity
+    from backend_v3.integrations.models import NormalizedPolicy, Provenance
+    from backend_v3.integrations.pipeline import upsert_policy
+
+    customer_id = list_customer_summaries()[0]["customer_id"]
+    policy_id = f"{TEST_PREFIX}-POL-{uuid.uuid4()}"
+    register_identity(customer_id, "external_id", customer_id, TEST_PREFIX)
+
+    result = upsert_policy(
+        NormalizedPolicy(
+            customer_external_id=customer_id,
+            policy_id=policy_id,
+            product_name="Test Policy",
+            line_of_business="Test LOB",
+            annual_premium=1234.0,
+            policy_status="active",
+            provenance=Provenance(TEST_PREFIX, policy_id, "test"),
+        )
+    )
+    assert result["written"] is True
+
+    ctx = assemble_customer_context(customer_id)
+    match = next((p for p in ctx["portfolio"] if p["policy_id"] == policy_id), None)
+    assert match is not None, "imported policy did not surface in the portfolio"
+    assert match["annual_premium"] == 1234.0
+    assert match["policy_status"] == "active"
+
+    from backend_v3.graph_store.neo4j_client import run_write
+
+    run_write("MATCH (:Customer)-[r:OWNS]->(p:Policy {policy_id: $id}) DELETE r, p", {"id": policy_id})
+
 
 def test_every_imported_record_carries_full_provenance():
     from backend_v3.integrations.models import Provenance
