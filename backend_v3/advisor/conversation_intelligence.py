@@ -9,7 +9,6 @@ customer truth until an advisor approves it via memory_model.py.
 """
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 from typing import Any
@@ -17,8 +16,6 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
-
-from backend_v3.config import GEMINI_API_KEY, GEMINI_MODEL
 
 EXTRACTION_SCHEMA = {
     "type": "object",
@@ -58,22 +55,13 @@ STRICT RULES:
 
 
 def analyze_conversation(transcript: str) -> dict[str, Any]:
-    if not GEMINI_API_KEY:
-        raise RuntimeError("GEMINI_API_KEY not configured")
     if not transcript or not transcript.strip():
         raise ValueError("Transcript is empty")
 
-    from google import genai
-    from google.genai import types
+    from backend_v3.advisor.ai_service import generate_json
 
-    client = genai.Client(api_key=GEMINI_API_KEY)
-    response = client.models.generate_content(
-        model=GEMINI_MODEL,
+    return generate_json(
         contents=f"Transcript:\n\n{transcript}",
-        config=types.GenerateContentConfig(
-            system_instruction=SYSTEM_INSTRUCTION,
-            response_mime_type="application/json",
-            response_schema=EXTRACTION_SCHEMA,
-        ),
+        system_instruction=SYSTEM_INSTRUCTION,
+        response_schema=EXTRACTION_SCHEMA,
     )
-    return json.loads(response.text)

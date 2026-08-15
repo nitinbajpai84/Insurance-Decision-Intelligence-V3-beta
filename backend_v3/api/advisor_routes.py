@@ -1,6 +1,8 @@
 """
-Advisor Customer Intelligence API — Milestone 1 (Know My Customer):
-Agent Home, Customer List, Customer 360, Prepare for Meeting.
+Advisor Customer Intelligence API.
+
+Stage 1 keeps the original customer and briefing endpoints stable while adding
+advisor SaaS surfaces for My Day, Tasks, Connections, and onboarding results.
 """
 from __future__ import annotations
 
@@ -18,56 +20,29 @@ router = APIRouter(prefix="/advisor", tags=["advisor"])
 
 @router.get("/customers")
 def list_customers():
-    """Agent Home + Customer List: every customer with a computed priority
-    signal (real, derived from life events/concerns/last-contact — not an
-    AI guess) so the advisor can see who needs attention first."""
-    from backend_v3.advisor.prioritization import compute_priority
-    from backend_v3.advisor.retrieval import list_customers as _list
+    from backend_v3.advisor.customer_service import list_customer_summaries
 
     try:
-        rows = _list()
+        return list_customer_summaries()
     except Exception as exc:
         raise HTTPException(503, f"Could not reach the customer graph: {type(exc).__name__}: {exc}")
-
-    out = []
-    for r in rows:
-        life_events = [e for e in r["life_events"] if e.get("description")]
-        concerns = [c for c in r["concerns"] if c.get("topic")]
-        meetings = [m for m in r["meetings"] if m.get("date")]
-        priority_info = compute_priority(life_events, concerns, meetings)
-        out.append({
-            "customer_id": r["customer_id"],
-            "name": r["name"],
-            "life_stage": r["life_stage"],
-            **priority_info,
-        })
-    priority_rank = {"high": 0, "medium": 1, "low": 2}
-    out.sort(key=lambda c: priority_rank.get(c["priority"], 3))
-    return out
 
 
 @router.get("/customers/{customer_id}")
 def get_customer_360(customer_id: str):
-    """Customer 360: full grounded profile — no Gemini call, this is pure
-    retrieval so it's instant and always available even if Gemini is down."""
-    from backend_v3.advisor.prioritization import compute_priority
-    from backend_v3.advisor.retrieval import assemble_customer_context
+    from backend_v3.advisor.customer_service import get_customer_360 as _get_customer_360
 
     try:
-        ctx = assemble_customer_context(customer_id)
+        ctx = _get_customer_360(customer_id)
     except Exception as exc:
         raise HTTPException(503, f"Could not reach customer data: {type(exc).__name__}: {exc}")
     if ctx is None:
         raise HTTPException(404, f"Customer {customer_id} not found")
-
-    priority_info = compute_priority(ctx["life_events"], ctx["concerns"], ctx["meetings"])
-    return {**ctx, **priority_info}
+    return ctx
 
 
 @router.post("/customers/{customer_id}/briefing")
 def prepare_meeting(customer_id: str):
-    """The hero action: 'Prepare for Meeting'. Retrieves Neo4j + Qdrant +
-    DuckDB context, then Gemini reasons over it into a structured brief."""
     from backend_v3.advisor.briefing_service import prepare_meeting_briefing
 
     try:
@@ -77,3 +52,40 @@ def prepare_meeting(customer_id: str):
     if briefing is None:
         raise HTTPException(404, f"Customer {customer_id} not found")
     return briefing
+
+
+@router.get("/my-day")
+def my_day():
+    from backend_v3.advisor.agent_service import get_my_day
+
+    try:
+        return get_my_day()
+    except Exception as exc:
+        raise HTTPException(503, f"Could not build My Day: {type(exc).__name__}: {exc}")
+
+
+@router.get("/tasks")
+def tasks():
+    from backend_v3.advisor.agent_service import list_tasks
+
+    try:
+        return list_tasks()
+    except Exception as exc:
+        raise HTTPException(503, f"Could not build task list: {type(exc).__name__}: {exc}")
+
+
+@router.get("/connections")
+def connections():
+    from backend_v3.advisor.integration_service import list_connections
+
+    return list_connections()
+
+
+@router.get("/onboarding/result")
+def onboarding_result():
+    from backend_v3.advisor.agent_service import get_onboarding_result
+
+    try:
+        return get_onboarding_result()
+    except Exception as exc:
+        raise HTTPException(503, f"Could not build onboarding result: {type(exc).__name__}: {exc}")

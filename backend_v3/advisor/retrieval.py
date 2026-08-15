@@ -169,27 +169,9 @@ def get_relevant_conversations(customer_id: str, query_text: str | None = None, 
     Qdrant is filtered to this customer_id either way, so this is really
     semantic *ranking* within one customer's notes, not cross-customer search.
     """
-    from backend_v3.ingestion.ocr import embed_text
-    from backend_v3.vector_store.qdrant_client import search
-    from qdrant_client.models import FieldCondition, Filter, MatchValue
+    from backend_v3.advisor.semantic_memory_service import get_relevant_conversation_memory
 
-    probe = query_text or f"Meeting preparation context and history for this customer."
-    vector = embed_text(probe)
-    hits = search(
-        "advisor_conversations",
-        vector,
-        limit=limit,
-        query_filter=Filter(must=[FieldCondition(key="customer_id", match=MatchValue(value=customer_id))]),
-    )
-    return [
-        {
-            "text": h["payload"]["text"],
-            "score": h["score"],
-            "source": "conversation_notes",
-            "confidence": round(min(1.0, h["score"]), 2),
-        }
-        for h in hits
-    ]
+    return get_relevant_conversation_memory(customer_id, query_text=query_text, limit=limit)
 
 
 def assemble_customer_context(customer_id: str) -> dict[str, Any] | None:

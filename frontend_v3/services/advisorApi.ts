@@ -109,6 +109,58 @@ export interface MemoryTimelineEntry {
   source: string;
 }
 
+export interface AdvisorTask {
+  task_id: string;
+  customer_id: string;
+  customer_name: string;
+  title: string;
+  due_date: string;
+  due_label?: string;
+  status: "open" | "done";
+  priority: "high" | "medium" | "low";
+  source: string;
+  type?: string;
+}
+
+export interface MyDay {
+  today: string;
+  summary: {
+    customers: number;
+    meetings_today: number;
+    upcoming_meetings: number;
+    customers_requiring_attention: number;
+    pending_followups: number;
+    new_customer_events: number;
+    stale_customer_information: number;
+    high_priority_customers: number;
+  };
+  meetings_today: { customer_id: string; customer_name: string; date: string; summary: string }[];
+  upcoming_meetings: { customer_id: string; customer_name: string; date: string; summary: string }[];
+  customers_requiring_attention: CustomerListItem[];
+  pending_followups: AdvisorTask[];
+  new_customer_events: CustomerListItem[];
+  stale_customer_information: CustomerListItem[];
+  high_priority_customers: CustomerListItem[];
+}
+
+export interface ConnectionProvider {
+  provider: string;
+  status: "connected" | "not_connected";
+  sync_status: "synced" | "syncing" | "error" | "not_configured";
+  last_sync: string | null;
+}
+
+export interface ConnectionCategory {
+  category: string;
+  providers: ConnectionProvider[];
+}
+
+export interface OnboardingResult {
+  customers: number;
+  upcoming_meetings: number;
+  message: string;
+}
+
 async function postRaw<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
@@ -123,6 +175,7 @@ async function postRaw<T>(path: string, body: unknown): Promise<T> {
 }
 
 export const advisorApi = {
+  getMyDay: () => getJSON<MyDay>("/api/v3/advisor/my-day"),
   listCustomers: () => getJSON<CustomerListItem[]>("/api/v3/advisor/customers"),
   getCustomer: (customerId: string) => getJSON<Customer360>(`/api/v3/advisor/customers/${encodeURIComponent(customerId)}`),
   uploadConversation: (customerId: string, transcript: string) =>
@@ -136,6 +189,9 @@ export const advisorApi = {
   rejectMemory: (memoryId: string) =>
     postRaw<{ memory_id: string; status: string }>(`/api/v3/advisor/memories/${encodeURIComponent(memoryId)}/reject`, {}),
   prepareMeeting: (customerId: string) => postJSON<Briefing>(`/api/v3/advisor/customers/${encodeURIComponent(customerId)}/briefing`),
+  listTasks: () => getJSON<AdvisorTask[]>("/api/v3/advisor/tasks"),
+  listConnections: () => getJSON<ConnectionCategory[]>("/api/v3/advisor/connections"),
+  getOnboardingResult: () => getJSON<OnboardingResult>("/api/v3/advisor/onboarding/result"),
 };
 
 export function money(v: number | null | undefined): string {

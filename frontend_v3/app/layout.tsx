@@ -3,8 +3,8 @@ import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 
 export const metadata: Metadata = {
-  title: "Meridian V3 (beta) — Neo4j + Qdrant context layer",
-  description: "Experimental rebuild of the context layer on Neo4j + Qdrant, with unstructured document ingestion."
+  title: "Advisor Intelligence",
+  description: "AI relationship intelligence for insurance and financial advisors."
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -16,10 +16,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="flex min-w-0 flex-1 flex-col">
             <header className="flex items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3 sm:px-6">
               <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Experimental workspace</p>
-                <p className="truncate text-sm font-bold text-gray-900">Meridian V3 — Graph + Vector Beta</p>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Advisor Intelligence</p>
+                <p className="truncate text-sm font-bold text-gray-900">Know every customer. Prepare for every conversation.</p>
               </div>
-              <span className="rounded-full bg-v3-amber/10 px-3 py-1 text-xs font-bold text-v3-amber">BETA</span>
+              <span className="rounded-full bg-v3-teal/10 px-3 py-1 text-xs font-bold text-v3-teal">STAGE 1</span>
             </header>
             <main className="flex-1">{children}</main>
           </div>

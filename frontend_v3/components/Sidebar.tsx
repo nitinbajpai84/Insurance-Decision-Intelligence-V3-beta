@@ -2,7 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileText, GitBranch, LayoutDashboard, Sparkles, Users } from "lucide-react";
+import {
+  CalendarDays,
+  CheckSquare,
+  FileText,
+  GitBranch,
+  LayoutDashboard,
+  Link2,
+  MessageSquareText,
+  Settings,
+  Sparkles,
+  Users
+} from "lucide-react";
 
 interface NavItem {
   href: string;
@@ -12,21 +23,22 @@ interface NavItem {
 
 const SECTIONS: { title: string | null; items: NavItem[] }[] = [
   {
-    title: null,
+    title: "Advisor workspace",
     items: [
-      { href: "/", label: "Overview", icon: LayoutDashboard },
-      { href: "/context-graph", label: "Context Graph", icon: GitBranch }
+      { href: "/advisor", label: "My Day", icon: CalendarDays },
+      { href: "/advisor/customers", label: "Customers", icon: Users },
+      { href: "/advisor/conversations", label: "Conversations", icon: MessageSquareText },
+      { href: "/advisor/tasks", label: "Tasks", icon: CheckSquare },
+      { href: "/advisor/connections", label: "Connections", icon: Link2 },
+      { href: "/advisor/settings", label: "Profile / Settings", icon: Settings }
     ]
   },
   {
-    title: "Claims intelligence",
-    items: [{ href: "/claims", label: "Claims", icon: FileText }]
-  },
-  {
-    title: "Advisor intelligence",
+    title: "Platform",
     items: [
-      { href: "/advisor", label: "Agent Home", icon: LayoutDashboard },
-      { href: "/advisor/customers", label: "Customers", icon: Users }
+      { href: "/", label: "Overview", icon: LayoutDashboard },
+      { href: "/context-graph", label: "Context Graph", icon: GitBranch },
+      { href: "/claims", label: "Claims", icon: FileText }
     ]
   }
 ];
@@ -48,8 +60,8 @@ export default function Sidebar() {
             <Sparkles size={22} />
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-v3-teal">Meridian</p>
-            <h1 className="text-lg font-bold leading-tight">V3 Beta</h1>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-v3-teal">Advisor</p>
+            <h1 className="text-lg font-bold leading-tight">Intelligence</h1>
           </div>
         </div>
       </div>
@@ -82,9 +94,9 @@ export default function Sidebar() {
       </nav>
 
       <div className="border-t border-white/10 p-5">
-        <div className="rounded-lg border border-v3-violet/30 bg-v3-violet/10 p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-v3-teal">Experimental</p>
-          <p className="mt-1 text-sm text-gray-200">Neo4j graph · Qdrant vectors · document ingestion</p>
+        <div className="rounded-lg border border-v3-teal/30 bg-v3-teal/10 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-v3-teal">Memory model</p>
+          <p className="mt-1 text-sm text-gray-200">AI proposes. Approved customer information becomes truth.</p>
         </div>
       </div>
     </aside>
