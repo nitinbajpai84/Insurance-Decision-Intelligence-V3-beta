@@ -129,6 +129,29 @@ def _call_gemini(ctx: dict[str, Any]) -> dict[str, Any]:
     )
 
 
+def _mark_prepared(customer_id: str) -> None:
+    """Record that a briefing was generated today, so My Day's "meetings
+    requiring preparation" can tell a prepared meeting from one still
+    waiting. Best-effort — a write failure here must not fail the
+    briefing that already succeeded."""
+    try:
+        from datetime import datetime, timezone
+
+        from backend_v3.graph_store.neo4j_client import run_write
+
+        run_write(
+            "MATCH (c:Customer {customer_id: $customer_id}) "
+            "SET c.last_prepared_date = $today, c.last_prepared_at = $now",
+            {
+                "customer_id": customer_id,
+                "today": datetime.now(timezone.utc).date().isoformat(),
+                "now": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+    except Exception:
+        pass
+
+
 def prepare_meeting_briefing(customer_id: str) -> dict[str, Any] | None:
     """The BE-6 Meeting Intelligence Service entry point: Customer ID ->
     Neo4j relationships + Qdrant memories + DuckDB portfolio -> Gemini
@@ -152,6 +175,8 @@ def prepare_meeting_briefing(customer_id: str) -> dict[str, Any] | None:
             "potential_discussion_areas": [],
             "_gemini_error": f"{type(exc).__name__}: {exc}",
         }
+
+    _mark_prepared(ctx["customer_id"])
 
     return {
         "customer_id": ctx["customer_id"],

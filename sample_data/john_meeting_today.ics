@@ -1,0 +1,16 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Advisor Intelligence//Stage 3 success test//EN
+CALSCALE:GREGORIAN
+BEGIN:VEVENT
+UID:stage3-john-meeting-0001@example.com
+SUMMARY:Annual review with John Kemp
+DTSTART:20260815T020000Z
+DTEND:20260815T030000Z
+ORGANIZER:mailto:nitin.bajpai@example.com
+ATTENDEE;CN=John Kemp:mailto:john.kemp@example.com
+LOCATION:Level 12 Meeting Room A
+STATUS:CONFIRMED
+DESCRIPTION:Annual review — education funding and retirement check-in.
+END:VEVENT
+END:VCALENDAR

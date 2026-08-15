@@ -15,6 +15,7 @@ no changes to the Stage 1 retrieval code.
 """
 from __future__ import annotations
 
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -249,12 +250,19 @@ def upsert_meeting(meeting: NormalizedMeeting) -> dict[str, Any]:
     organizer_normalized = (meeting.organizer or "").strip().lower()
 
     for attendee in meeting.attendees:
+        # Attendees may arrive as "Name <email>" (calendar_sources keeps
+        # the CN so a customer with no email on file can still produce a
+        # name candidate) — extract the address for the organizer check
+        # and the direct-email lookup rather than comparing the raw string.
+        attendee_email_match = re.search(r"[\w.+-]+@[\w-]+\.[\w.-]+", attendee)
+        attendee_email = attendee_email_match.group(0).lower() if attendee_email_match else attendee.strip().lower()
+
         # The advisor is on their own meetings; they are not the customer.
-        if organizer_normalized and attendee.strip().lower() == organizer_normalized:
+        if organizer_normalized and attendee_email == organizer_normalized:
             continue
         match = resolve_identity(
             calendar_attendee=attendee,
-            email=attendee if "@" in attendee else None,
+            email=attendee_email if attendee_email_match else None,
             source_system=provenance.source_system,
         )
         if match.resolved and match.customer_id:

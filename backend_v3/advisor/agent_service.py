@@ -63,11 +63,13 @@ def _build_followups(customers: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _calendar_meetings() -> dict[str, list[dict[str, Any]]]:
-    """Stage 2 calendar meetings. A calendar that is not connected simply
-    contributes nothing — it must never break My Day."""
+    """Stage 2/3 calendar and meeting-lifecycle data. A calendar that is
+    not connected simply contributes nothing — it must never break My Day."""
     try:
         from backend_v3.advisor.meeting_service import (
+            list_completed_meetings_awaiting_processing,
             list_meetings_for_date,
+            list_meetings_requiring_preparation,
             list_unmatched_meetings,
             list_upcoming_meetings,
         )
@@ -76,9 +78,29 @@ def _calendar_meetings() -> dict[str, list[dict[str, Any]]]:
             "today": list_meetings_for_date(),
             "upcoming": list_upcoming_meetings(),
             "unmatched": list_unmatched_meetings(),
+            "requiring_preparation": list_meetings_requiring_preparation(),
+            "awaiting_processing": list_completed_meetings_awaiting_processing(),
         }
     except Exception:
-        return {"today": [], "upcoming": [], "unmatched": []}
+        return {"today": [], "upcoming": [], "unmatched": [], "requiring_preparation": [], "awaiting_processing": []}
+
+
+def _pending_memory_reviews(limit: int = 20) -> list[dict[str, Any]]:
+    try:
+        from backend_v3.advisor.memory_model import list_all_pending_memories
+
+        return list_all_pending_memories(limit=limit)
+    except Exception:
+        return []
+
+
+def _overdue_followups(limit: int = 20) -> list[dict[str, Any]]:
+    try:
+        from backend_v3.advisor.followups import list_followups
+
+        return list_followups(overdue_only=True)[:limit]
+    except Exception:
+        return []
 
 
 def get_my_day() -> dict[str, Any]:
@@ -146,6 +168,9 @@ def get_my_day() -> dict[str, Any]:
     upcoming_meetings = calendar_upcoming + upcoming_meetings
     matched_today = [m for m in calendar["today"] if m["match_status"] == "matched"]
 
+    pending_memory_reviews = _pending_memory_reviews()
+    overdue_followups = _overdue_followups()
+
     return {
         "today": today_iso,
         "calendar_meetings_today": calendar_today,
@@ -153,6 +178,11 @@ def get_my_day() -> dict[str, Any]:
         # The success-test line. Counts meetings actually resolved to a
         # customer; an unmatched calendar entry is not yet one.
         "meetings_message": f"You have {len(matched_today)} customer meetings today.",
+        # Stage 3: the before/during/after meeting lifecycle.
+        "meetings_requiring_preparation": calendar["requiring_preparation"][:8],
+        "meetings_awaiting_processing": calendar["awaiting_processing"][:8],
+        "memory_updates_awaiting_approval": pending_memory_reviews[:8],
+        "overdue_followups": overdue_followups[:8],
         "summary": {
             "customers": len(customers),
             "meetings_today": len(meetings_today),
@@ -164,6 +194,10 @@ def get_my_day() -> dict[str, Any]:
             "new_customer_events": len(new_events),
             "stale_customer_information": len(stale),
             "high_priority_customers": len(high_priority),
+            "meetings_requiring_preparation": len(calendar["requiring_preparation"]),
+            "meetings_awaiting_processing": len(calendar["awaiting_processing"]),
+            "memory_updates_awaiting_approval": len(pending_memory_reviews),
+            "overdue_followups": len(overdue_followups),
         },
         "meetings_today": meetings_today,
         "upcoming_meetings": upcoming_meetings,

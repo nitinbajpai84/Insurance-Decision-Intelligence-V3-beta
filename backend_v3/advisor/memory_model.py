@@ -37,11 +37,14 @@ if str(PROJECT_ROOT) not in sys.path:
 MEMORY_TYPES = ("life_event", "goal", "need", "concern", "preference", "objection", "commitment", "follow_up")
 
 # memory_type -> which existing node label/relationship a conflict check
-# and an approval-promotion should target. preference/objection/commitment/
-# follow_up don't have a Milestone 1 node shape to promote into, so they
-# stay as PendingMemory-only facts once approved (still queryable, just
-# not merged into Goal/Need/LifeEvent/Topic).
+# and an approval-promotion should target. preference/objection/commitment
+# don't have a node shape to promote into, so they stay as
+# PendingMemory-only facts once approved (still queryable, just not
+# merged into a dedicated node). follow_up promotes into :FollowUp
+# (followups.py) rather than Goal/Need/LifeEvent/Topic, since it needs its
+# own lifecycle — due date, assignment, completion — the others don't.
 _PROMOTABLE = {"life_event", "goal", "need", "concern"}
+_PROMOTABLE_TO_FOLLOWUP = {"follow_up"}
 
 
 def _now() -> str:
@@ -182,14 +185,30 @@ def approve_memory(memory_id: str, edited_value: str | None = None) -> dict[str,
         {"memory_id": memory_id, "status": new_status, "final_value": final_value, "now": _now()},
     )
 
+    followup_id = None
     if mem["memory_type"] in _PROMOTABLE:
         conversation_id = mem["source"].replace("conversation_", "", 1)
         _promote_to_graph_fact(
             mem["customer_id"], mem["memory_type"], final_value, mem.get("category"),
             conversation_id, mem["confidence"],
         )
+    elif mem["memory_type"] in _PROMOTABLE_TO_FOLLOWUP:
+        from backend_v3.advisor.followups import create_followup
 
-    return {"memory_id": memory_id, "status": new_status, "value": final_value, "promoted": mem["memory_type"] in _PROMOTABLE}
+        created = create_followup(
+            customer_id=mem["customer_id"],
+            title=final_value,
+            source=mem["source"],
+            evidence=mem.get("evidence"),
+            confidence=mem["confidence"],
+        )
+        followup_id = created["followup_id"]
+
+    promoted = mem["memory_type"] in _PROMOTABLE or mem["memory_type"] in _PROMOTABLE_TO_FOLLOWUP
+    return {
+        "memory_id": memory_id, "status": new_status, "value": final_value,
+        "promoted": promoted, "followup_id": followup_id,
+    }
 
 
 def reject_memory(memory_id: str) -> dict[str, Any]:
@@ -200,6 +219,23 @@ def reject_memory(memory_id: str) -> dict[str, Any]:
         {"memory_id": memory_id, "now": _now()},
     )
     return {"memory_id": memory_id, "status": "rejected"}
+
+
+def list_all_pending_memories(limit: int = 20) -> list[dict[str, Any]]:
+    """Pending memories across every customer, for My Day's
+    "memory updates awaiting approval" panel — a single advisor's queue,
+    not something Customer 360's per-customer view exposes."""
+    from backend_v3.graph_store.neo4j_client import run_query
+
+    return run_query(
+        "MATCH (c:Customer)-[:HAS_PENDING_MEMORY]->(m:PendingMemory {status: 'pending'}) "
+        "RETURN m.memory_id AS memory_id, c.customer_id AS customer_id, c.name AS customer_name, "
+        "m.memory_type AS memory_type, m.value AS value, m.category AS category, "
+        "m.evidence AS evidence, m.confidence AS confidence, m.created_at AS created_at, "
+        "m.has_conflict AS has_conflict, m.conflict_with AS conflict_with "
+        "ORDER BY m.created_at DESC LIMIT $limit",
+        {"limit": limit},
+    )
 
 
 def get_memory_timeline(customer_id: str) -> list[dict[str, Any]]:

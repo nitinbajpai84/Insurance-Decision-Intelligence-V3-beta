@@ -104,6 +104,63 @@ def list_unmatched_meetings(limit: int = 20) -> list[dict[str, Any]]:
     return [_row_to_meeting(row) for row in rows]
 
 
+_FIELDS = (
+    "RETURN m.meeting_id AS meeting_id, m.title AS title, m.starts_at AS starts_at, "
+    "m.ends_at AS ends_at, m.meeting_date AS meeting_date, m.meeting_link AS meeting_link, "
+    "m.location AS location, m.status AS status, m.attendees AS attendees, "
+    "m.organizer AS organizer, m.customer_id AS customer_id, m.match_status AS match_status, "
+    "m.matched_on AS matched_on, m.source_system AS source_system, c.name AS customer_name "
+)
+
+
+def list_meetings_requiring_preparation(limit: int = 20) -> list[dict[str, Any]]:
+    """Matched meetings, today or later, for a customer no briefing has
+    been generated for yet today.
+
+    briefing_service marks a customer prepared for the day when a
+    briefing is generated; a meeting for a customer prepared some other
+    day still counts as unprepared, since that briefing is stale for
+    today's context.
+    """
+    from backend_v3.graph_store.neo4j_client import run_query
+
+    rows = run_query(
+        "MATCH (m:CalendarEvent) "
+        "WHERE m.match_status = 'matched' AND m.meeting_date >= $date "
+        "  AND coalesce(m.status,'confirmed') <> 'cancelled' "
+        "MATCH (c:Customer {customer_id: m.customer_id}) "
+        "WHERE c.last_prepared_date IS NULL OR c.last_prepared_date <> $date "
+        + _FIELDS
+        + "ORDER BY m.starts_at LIMIT $limit",
+        {"date": TODAY.isoformat(), "limit": limit},
+    )
+    return [_row_to_meeting(row) for row in rows]
+
+
+def list_completed_meetings_awaiting_processing(limit: int = 20) -> list[dict[str, Any]]:
+    """Past matched meetings with no transcript/notes captured yet.
+
+    A meeting counts as processed once a Conversation exists for that
+    customer dated the same day — the same record a transcript upload or
+    a future Teams/Zoom sync would create.
+    """
+    from backend_v3.graph_store.neo4j_client import run_query
+
+    rows = run_query(
+        "MATCH (m:CalendarEvent) "
+        "WHERE m.match_status = 'matched' AND m.meeting_date < $date "
+        "  AND coalesce(m.status,'confirmed') <> 'cancelled' "
+        "MATCH (c:Customer {customer_id: m.customer_id}) "
+        "WHERE NOT EXISTS {"
+        "  MATCH (c)-[:HAD_CONVERSATION]->(conv:Conversation) WHERE conv.date = m.meeting_date"
+        "} "
+        + _FIELDS
+        + "ORDER BY m.starts_at DESC LIMIT $limit",
+        {"date": TODAY.isoformat(), "limit": limit},
+    )
+    return [_row_to_meeting(row) for row in rows]
+
+
 def today_summary() -> dict[str, Any]:
     """Backs the success-test line: 'You have N customer meetings today.'
 

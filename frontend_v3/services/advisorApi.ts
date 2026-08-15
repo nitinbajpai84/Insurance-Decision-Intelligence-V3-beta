@@ -152,11 +152,56 @@ export interface TodayMeetings {
   meetings: CalendarMeeting[];
 }
 
+export interface FollowUp {
+  followup_id: string;
+  customer_id: string;
+  customer_name: string;
+  title: string;
+  evidence: string | null;
+  confidence: number;
+  due_date: string;
+  assigned_to: string;
+  status: "open" | "completed";
+  source: string;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface PendingMemoryReview {
+  memory_id: string;
+  customer_id: string;
+  customer_name: string;
+  memory_type: string;
+  value: string;
+  category: string | null;
+  evidence: string;
+  confidence: number;
+  created_at: string;
+  has_conflict: boolean;
+  conflict_with: string | null;
+}
+
+export interface MeetingHistoryEntry {
+  conversation_id: string;
+  date: string;
+  summary: string;
+  interaction_type: string;
+  source_system: string | null;
+  insights: { memory_id: string; memory_type: string; value: string; evidence: string; confidence: number }[];
+  memory_changes: { memory_id: string; memory_type: string; value: string; status: string }[];
+  pending_review_count: number;
+  follow_ups: { followup_id: string; title: string; due_date: string; assigned_to: string; status: string }[];
+}
+
 export interface MyDay {
   today: string;
   meetings_message: string;
   calendar_meetings_today: CalendarMeeting[];
   unmatched_meetings: CalendarMeeting[];
+  meetings_requiring_preparation: CalendarMeeting[];
+  meetings_awaiting_processing: CalendarMeeting[];
+  memory_updates_awaiting_approval: PendingMemoryReview[];
+  overdue_followups: FollowUp[];
   summary: {
     customers: number;
     meetings_today: number;
@@ -168,6 +213,10 @@ export interface MyDay {
     new_customer_events: number;
     stale_customer_information: number;
     high_priority_customers: number;
+    meetings_requiring_preparation: number;
+    meetings_awaiting_processing: number;
+    memory_updates_awaiting_approval: number;
+    overdue_followups: number;
   };
   meetings_today: { customer_id: string; customer_name: string; date: string; summary: string }[];
   upcoming_meetings: { customer_id: string; customer_name: string; date: string; summary: string }[];
@@ -273,6 +322,92 @@ async function postFile<T>(path: string, file: File, fields: Record<string, stri
   return body as T;
 }
 
+export interface CredentialField {
+  key: string;
+  label: string;
+  help_text: string;
+  secret: boolean;
+  optional: boolean;
+  default: string;
+}
+
+export interface AccountCapability {
+  provider: string;
+  name: string;
+  category: string;
+  implementation: string;
+  scopes: string[];
+}
+
+export interface AccountProvider {
+  account: string;
+  name: string;
+  auth_kind: string;
+  console_url: string;
+  console_name: string;
+  docs_url: string;
+  setup_steps: string[];
+  notes: string;
+  redirect_uri: string;
+  capabilities: AccountCapability[];
+  credential_fields: CredentialField[];
+  credentials_configured: boolean;
+  credentials_source: string;
+  missing_credentials: string[];
+}
+
+export interface CrmVendor {
+  provider: string;
+  vendor: string;
+  name: string;
+  access: "self_serve_oauth" | "partner_gated";
+  auth_kind: string;
+  docs_url: string;
+  notes: string;
+  csv_export_hint: string;
+  credential_fields: { key: string; label: string; secret: boolean }[];
+  credentials_configured: boolean;
+  hints: Record<string, string>;
+  status: string;
+  account: string | null;
+  last_sync: string | null;
+  data_synchronized: Record<string, number>;
+  connected: boolean;
+}
+
+async function putJSON<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body)
+  });
+  const parsed = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(parsed.detail || `PUT ${path} -> HTTP ${res.status}`);
+  return parsed as T;
+}
+
+export const accountApi = {
+  list: () => getJSON<AccountProvider[]>("/api/v3/integrations/accounts"),
+  get: (account: string) => getJSON<AccountProvider>(`/api/v3/integrations/accounts/${encodeURIComponent(account)}`),
+  saveCredentials: (account: string, values: Record<string, string>) =>
+    putJSON<Record<string, unknown>>(`/api/v3/integrations/accounts/${encodeURIComponent(account)}/credentials`, { values }),
+  connect: (account: string, capabilities?: string[]) =>
+    postRaw<{ mode: string; authorization_url?: string; webhook_url?: string; verified_name?: string }>(
+      `/api/v3/integrations/accounts/${encodeURIComponent(account)}/connect`,
+      { capabilities: capabilities ?? null }
+    ),
+  disconnect: (account: string) =>
+    postRaw<Record<string, unknown>>(`/api/v3/integrations/accounts/${encodeURIComponent(account)}/disconnect`, {}),
+  listCrm: () => getJSON<CrmVendor[]>("/api/v3/integrations/crm"),
+  saveCrmCredentials: (vendor: string, values: Record<string, string>) =>
+    putJSON<Record<string, unknown>>(`/api/v3/integrations/crm/${encodeURIComponent(vendor)}/credentials`, { values }),
+  connectCrm: (vendor: string) =>
+    postRaw<{ mode: string; authorization_url?: string; connected?: boolean; next?: string }>(
+      `/api/v3/integrations/crm/${encodeURIComponent(vendor)}/connect`,
+      {}
+    )
+};
+
 export const integrationApi = {
   connectionCenter: () => getJSON<ConnectionCenterCategory[]>("/api/v3/integrations"),
   connect: (provider: string) =>
@@ -310,8 +445,11 @@ export const advisorApi = {
   getMyDay: () => getJSON<MyDay>("/api/v3/advisor/my-day"),
   listCustomers: () => getJSON<CustomerListItem[]>("/api/v3/advisor/customers"),
   getCustomer: (customerId: string) => getJSON<Customer360>(`/api/v3/advisor/customers/${encodeURIComponent(customerId)}`),
-  uploadConversation: (customerId: string, transcript: string) =>
-    postRaw<IngestConversationResult>(`/api/v3/advisor/customers/${encodeURIComponent(customerId)}/conversations`, { transcript }),
+  uploadConversation: (customerId: string, transcript: string, interactionType: "transcript" | "notes" = "transcript") =>
+    postRaw<IngestConversationResult>(`/api/v3/advisor/customers/${encodeURIComponent(customerId)}/conversations`, {
+      transcript,
+      interaction_type: interactionType
+    }),
   listConversations: (customerId: string) => getJSON<ConversationRecord[]>(`/api/v3/advisor/customers/${encodeURIComponent(customerId)}/conversations`),
   listPendingMemories: (customerId: string, status = "pending") =>
     getJSON<ProposedMemory[]>(`/api/v3/advisor/customers/${encodeURIComponent(customerId)}/pending-memories?status=${status}`),
@@ -326,7 +464,35 @@ export const advisorApi = {
   listUnmatchedMeetings: () => getJSON<CalendarMeeting[]>("/api/v3/advisor/meetings/unmatched"),
   listConnections: () => getJSON<ConnectionCategory[]>("/api/v3/advisor/connections"),
   getOnboardingResult: () => getJSON<OnboardingResult>("/api/v3/advisor/onboarding/result"),
+  listFollowUps: (opts?: { status?: string; overdue?: boolean }) => {
+    const params = new URLSearchParams();
+    if (opts?.status) params.set("status", opts.status);
+    if (opts?.overdue) params.set("overdue", "true");
+    const qs = params.toString();
+    return getJSON<FollowUp[]>(`/api/v3/advisor/follow-ups${qs ? `?${qs}` : ""}`);
+  },
+  listCustomerFollowUps: (customerId: string) =>
+    getJSON<FollowUp[]>(`/api/v3/advisor/customers/${encodeURIComponent(customerId)}/follow-ups`),
+  updateFollowUp: (followupId: string, changes: { title?: string; due_date?: string; assigned_to?: string }) =>
+    patchJSON<FollowUp>(`/api/v3/advisor/follow-ups/${encodeURIComponent(followupId)}`, changes),
+  completeFollowUp: (followupId: string) =>
+    postRaw<FollowUp>(`/api/v3/advisor/follow-ups/${encodeURIComponent(followupId)}/complete`, {}),
+  reopenFollowUp: (followupId: string) =>
+    postRaw<FollowUp>(`/api/v3/advisor/follow-ups/${encodeURIComponent(followupId)}/reopen`, {}),
+  getMeetingHistory: (customerId: string) =>
+    getJSON<MeetingHistoryEntry[]>(`/api/v3/advisor/customers/${encodeURIComponent(customerId)}/meeting-history`),
 };
+
+async function patchJSON<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body)
+  });
+  const parsed = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(parsed.detail || `PATCH ${path} -> HTTP ${res.status}`);
+  return parsed as T;
+}
 
 export function money(v: number | null | undefined): string {
   if (v === null || v === undefined) return "—";

@@ -36,6 +36,21 @@ def cleanup_stage2_artifacts():
         "MATCH (i:CustomerIdentity) WHERE i.customer_id STARTS WITH $prefix DETACH DELETE i",
         {"prefix": f"{TEST_PREFIX}_"},
     )
+    # register_identity() merges a CustomerIdentity onto the REAL seeded
+    # customer under test (e.g. John Kemp), not a stage2test_-prefixed
+    # one — the two matches above miss it entirely, since neither its
+    # properties nor its customer_id carry the test prefix. Only the
+    # HAS_IDENTITY relationship's `source` does.
+    run_write(
+        "MATCH (:Customer)-[r:HAS_IDENTITY {source: $source}]->(i:CustomerIdentity) DETACH DELETE i",
+        {"source": TEST_PREFIX},
+    )
+    run_write(
+        "MATCH (i:CustomerIdentity) WHERE i.value_raw STARTS WITH $prefix "
+        "   OR i.value_normalized STARTS WITH $prefix "
+        "DETACH DELETE i",
+        {"prefix": TEST_PREFIX},
+    )
     run_write("MATCH (c:Connection {provider: $p}) DETACH DELETE c", {"p": TEST_PREFIX})
 
 
@@ -166,7 +181,10 @@ def test_ics_parsing_extracts_the_fields_my_day_needs():
     meeting = meetings[0]
     assert meeting.external_id == "stage2-evt-1"
     assert meeting.title == "Review with Someone"
-    assert meeting.attendees == ["someone@example.com"]
+    # Stage 3: the CN display name is preserved as "Name <email>" so a
+    # customer with no email on file can still produce a name candidate
+    # for "Customer match required." — see calendar_sources._CN_PATTERN.
+    assert meeting.attendees == ["Someone <someone@example.com>"]
     assert meeting.organizer == "advisor@example.com"
     assert meeting.meeting_link and "zoom.us" in meeting.meeting_link
     assert meeting.provenance and meeting.provenance.source_system == "ics"

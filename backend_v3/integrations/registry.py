@@ -43,6 +43,34 @@ class Provider:
     notes: str = ""
 
     def missing_config(self) -> list[str]:
+        """What still has to be supplied before this provider can connect.
+
+        Credentials may arrive two ways: environment variables (operator
+        managed) or the in-app setup screen. Providers that belong to an
+        account provider defer to it, since the whole group shares one
+        credential and one consent.
+        """
+        from backend_v3.integrations.accounts import account_for_capability
+
+        account = account_for_capability(self.key)
+        if account is not None:
+            from backend_v3.integrations.credentials import credential_status
+
+            try:
+                status = credential_status(account.key)
+            except Exception:
+                return [f"{account.name} credentials"]
+            return [] if status["configured"] else [f"{account.name} credentials"]
+
+        if self.key.startswith("crm_"):
+            from backend_v3.integrations.credentials import credential_status
+
+            try:
+                status = credential_status(self.key)
+            except Exception:
+                return [f"{self.name} credentials"]
+            return [] if status["configured"] else [f"{self.name} credentials"]
+
         return [name for name in self.required_env if not os.environ.get(name, "").strip()]
 
     def is_configurable(self) -> bool:
@@ -66,14 +94,70 @@ PROVIDERS: tuple[Provider, ...] = (
         notes="Advisor uploads a file; validation and duplicate detection run before anything is written.",
     ),
     Provider(
-        key="crm",
-        name="CRM",
+        key="crm_salesforce",
+        name="Salesforce",
         category="Customer Data",
-        implementation=ARCHITECTURE,
+        implementation=CREDENTIALED,
         auth="oauth2",
-        scopes=("customers.read", "policies.read", "activities.read"),
-        produces=("Customer", "Contact", "Policy", "Interaction", "Activity"),
-        notes="Vendor-neutral connector contract. A concrete CRM connector implements crm.base.CRMConnector.",
+        required_env=(),
+        scopes=("api", "refresh_token"),
+        produces=("Customer", "Contact", "Interaction"),
+        notes="Connected App OAuth. Reads Account, Contact, and Task via SOQL.",
+    ),
+    Provider(
+        key="crm_hubspot",
+        name="HubSpot",
+        category="Customer Data",
+        implementation=CREDENTIALED,
+        auth="api_token",
+        scopes=("crm.objects.contacts.read", "crm.objects.companies.read"),
+        produces=("Customer", "Contact"),
+        notes="Private app token is the quickest path — no OAuth round trip needed.",
+    ),
+    Provider(
+        key="crm_agencyzoom",
+        name="AgencyZoom",
+        category="Customer Data",
+        implementation=CREDENTIALED,
+        auth="api_token",
+        produces=("Customer", "Contact"),
+        notes="API access is issued per agency. CSV export works today via the importer.",
+    ),
+    Provider(
+        key="crm_applied_epic",
+        name="Applied Epic",
+        category="Customer Data",
+        implementation=CREDENTIALED,
+        auth="oauth2",
+        produces=("Customer", "Contact", "Policy"),
+        notes="Requires Applied Developer Program enrolment. CSV export works today via the importer.",
+    ),
+    Provider(
+        key="crm_ezlynx",
+        name="EZLynx",
+        category="Customer Data",
+        implementation=CREDENTIALED,
+        auth="api_token",
+        produces=("Customer", "Contact", "Policy"),
+        notes="API access is arranged through an EZLynx partner agreement. CSV export works today.",
+    ),
+    Provider(
+        key="crm_hawksoft",
+        name="HawkSoft",
+        category="Customer Data",
+        implementation=CREDENTIALED,
+        auth="api_token",
+        produces=("Customer", "Contact", "Policy"),
+        notes="API access is granted through the HawkSoft Partner Program. CSV export works today.",
+    ),
+    Provider(
+        key="crm_insuredmine",
+        name="InsuredMine",
+        category="Customer Data",
+        implementation=CREDENTIALED,
+        auth="api_token",
+        produces=("Customer", "Contact"),
+        notes="API keys are issued from your InsuredMine account. CSV export works today.",
     ),
     # --- 2/3. Calendar ------------------------------------------------------
     Provider(
@@ -112,7 +196,7 @@ PROVIDERS: tuple[Provider, ...] = (
         key="teams",
         name="Microsoft Teams",
         category="Meetings",
-        implementation=ARCHITECTURE,
+        implementation=CREDENTIALED,
         auth="oauth2",
         scopes=("OnlineMeetings.Read", "OnlineMeetingTranscript.Read.All"),
         produces=("Interaction",),
@@ -143,7 +227,7 @@ PROVIDERS: tuple[Provider, ...] = (
         key="m365_email",
         name="Microsoft 365/Outlook",
         category="Communication",
-        implementation=ARCHITECTURE,
+        implementation=CREDENTIALED,
         auth="oauth2",
         scopes=("Mail.Read",),
         produces=("Interaction",),
@@ -153,7 +237,7 @@ PROVIDERS: tuple[Provider, ...] = (
         key="gmail",
         name="Gmail",
         category="Communication",
-        implementation=ARCHITECTURE,
+        implementation=CREDENTIALED,
         auth="oauth2",
         scopes=("https://www.googleapis.com/auth/gmail.readonly",),
         produces=("Interaction",),
@@ -164,7 +248,7 @@ PROVIDERS: tuple[Provider, ...] = (
         key="whatsapp_business",
         name="WhatsApp Business",
         category="Communication",
-        implementation=ARCHITECTURE,
+        implementation=CREDENTIALED,
         auth="oauth2",
         scopes=("whatsapp_business_messaging", "whatsapp_business_management"),
         produces=("Interaction",),
@@ -175,7 +259,7 @@ PROVIDERS: tuple[Provider, ...] = (
         key="onedrive",
         name="OneDrive",
         category="Files",
-        implementation=ARCHITECTURE,
+        implementation=CREDENTIALED,
         auth="oauth2",
         scopes=("Files.Read",),
         produces=("Interaction",),
@@ -185,7 +269,7 @@ PROVIDERS: tuple[Provider, ...] = (
         key="sharepoint",
         name="SharePoint",
         category="Files",
-        implementation=ARCHITECTURE,
+        implementation=CREDENTIALED,
         auth="oauth2",
         scopes=("Sites.Read.All",),
         produces=("Interaction",),
@@ -195,7 +279,7 @@ PROVIDERS: tuple[Provider, ...] = (
         key="google_drive",
         name="Google Drive",
         category="Files",
-        implementation=ARCHITECTURE,
+        implementation=CREDENTIALED,
         auth="oauth2",
         scopes=("https://www.googleapis.com/auth/drive.readonly",),
         produces=("Interaction",),

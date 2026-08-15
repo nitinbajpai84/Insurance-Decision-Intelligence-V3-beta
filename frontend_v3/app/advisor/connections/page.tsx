@@ -15,9 +15,12 @@ import {
   Video
 } from "lucide-react";
 import {
+  accountApi,
   integrationApi,
+  type AccountProvider,
   type ConnectionCenterCategory,
-  type ConnectionRow
+  type ConnectionRow,
+  type CrmVendor
 } from "@/services/advisorApi";
 
 const CATEGORY_ICON: Record<string, React.ReactNode> = {
@@ -49,21 +52,46 @@ function formatSynchronized(data: Record<string, number>): string {
 
 export default function ConnectionsPage() {
   const [categories, setCategories] = useState<ConnectionCenterCategory[] | null>(null);
+  const [accounts, setAccounts] = useState<AccountProvider[]>([]);
+  const [crms, setCrms] = useState<CrmVendor[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
 
   const load = useCallback(() => {
-    integrationApi
-      .connectionCenter()
-      .then((data) => {
-        setCategories(data);
+    Promise.all([integrationApi.connectionCenter(), accountApi.list(), accountApi.listCrm()])
+      .then(([center, accountRows, crmRows]) => {
+        setCategories(center);
+        setAccounts(accountRows);
+        setCrms(crmRows);
         setError("");
       })
       .catch((e) => setError(e.message));
   }, []);
 
   useEffect(load, [load]);
+
+  function connectedCapabilities(account: AccountProvider): number {
+    const rows = (categories || []).flatMap((group) => group.providers);
+    return account.capabilities.filter(
+      (capability) => rows.find((r) => r.provider === capability.provider)?.connected
+    ).length;
+  }
+
+  async function disconnectAccount(account: AccountProvider) {
+    setBusy(`account:${account.account}`);
+    setError("");
+    setNotice("");
+    try {
+      await accountApi.disconnect(account.account);
+      setNotice(`${account.name} disconnected and its stored credentials destroyed.`);
+      load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy("");
+    }
+  }
 
   async function act(provider: ConnectionRow, action: "connect" | "disconnect" | "sync") {
     setBusy(`${provider.provider}:${action}`);
@@ -127,6 +155,136 @@ export default function ConnectionsPage() {
         <p className="rounded-lg border border-v3-rose/30 bg-v3-rose/5 px-4 py-3 text-sm text-v3-rose">{error}</p>
       )}
       {!categories && !error && <p className="text-sm text-gray-400">Loading...</p>}
+
+      {accounts.length > 0 && (
+        <section>
+          <h2 className="text-base font-bold text-gray-900">Your accounts</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            These systems share one sign-in each. Connecting an account enables everything under it in a single
+            consent, rather than one connection per capability.
+          </p>
+          <div className="mt-4 grid gap-4 lg:grid-cols-3">
+            {accounts.map((account) => {
+              const connected = connectedCapabilities(account);
+              return (
+                <div key={account.account} className="flex flex-col rounded-lg border border-gray-100 bg-white p-5 shadow-card">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-bold text-gray-900">{account.name}</h3>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                        connected > 0 ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      {connected > 0 ? `${connected} active` : "Not connected"}
+                    </span>
+                  </div>
+
+                  <ul className="mt-3 flex-1 space-y-1">
+                    {account.capabilities.map((capability) => {
+                      const row = (categories || [])
+                        .flatMap((g) => g.providers)
+                        .find((r) => r.provider === capability.provider);
+                      const on = Boolean(row?.connected);
+                      return (
+                        <li key={capability.provider} className="flex items-center gap-2 text-sm">
+                          <span
+                            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${
+                              on ? "bg-v3-teal text-white" : "bg-gray-100 text-gray-400"
+                            }`}
+                          >
+                            {on ? <Check size={10} /> : <span className="h-1 w-1 rounded-full bg-current" />}
+                          </span>
+                          <span className={on ? "text-gray-900" : "text-gray-500"}>{capability.name}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+
+                  <p className="mt-3 text-xs text-gray-500">
+                    {account.credentials_configured
+                      ? "Credentials configured."
+                      : "Needs a one-time app registration with the provider."}
+                  </p>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Link
+                      href={`/advisor/connections/accounts/${account.account}`}
+                      className="rounded-lg bg-v3-violet px-3 py-1.5 text-xs font-bold text-white hover:bg-v3-violetDark"
+                    >
+                      {account.credentials_configured ? "Manage" : "Set up"}
+                    </Link>
+                    {connected > 0 && (
+                      <button
+                        onClick={() => disconnectAccount(account)}
+                        disabled={busy !== ""}
+                        className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-bold text-gray-700 hover:border-v3-rose hover:text-v3-rose disabled:opacity-50"
+                      >
+                        Disconnect
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {crms.length > 0 && (
+        <section className="rounded-lg border border-gray-100 bg-white shadow-card">
+          <div className="flex items-center gap-2 border-b border-gray-100 px-5 py-4">
+            <Database size={17} className="text-v3-violet" />
+            <h2 className="font-bold text-gray-900">Agency management and CRM</h2>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {crms.map((crm) => (
+              <div key={crm.provider} className="flex flex-wrap items-start justify-between gap-3 p-4">
+                <div className="min-w-0 max-w-xl">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-semibold text-gray-900">{crm.name}</p>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                        crm.access === "self_serve_oauth"
+                          ? "bg-green-50 text-green-700"
+                          : "bg-amber-50 text-amber-700"
+                      }`}
+                    >
+                      {crm.access === "self_serve_oauth" ? "Self-serve API" : "Partner-gated API"}
+                    </span>
+                    {crm.connected && (
+                      <span className="rounded-full bg-v3-teal/10 px-2 py-0.5 text-[10px] font-bold uppercase text-v3-teal">
+                        Connected
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-gray-500">{crm.notes}</p>
+                  {crm.access === "partner_gated" && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Works today via CSV import — {crm.csv_export_hint}
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    href={`/advisor/connections/crm/${crm.vendor}`}
+                    className="rounded-lg bg-v3-violet px-3 py-1.5 text-xs font-bold text-white hover:bg-v3-violetDark"
+                  >
+                    {crm.credentials_configured ? "Manage" : "Set up"}
+                  </Link>
+                  <Link
+                    href="/advisor/connections/import"
+                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-bold text-gray-700 hover:border-v3-violet hover:text-v3-violet"
+                  >
+                    Import CSV
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <h2 className="pt-2 text-base font-bold text-gray-900">All integrations</h2>
 
       {categories?.map((group) => (
         <section key={group.category} className="rounded-lg border border-gray-100 bg-white shadow-card">

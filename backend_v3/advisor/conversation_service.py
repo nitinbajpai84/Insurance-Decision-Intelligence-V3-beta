@@ -19,7 +19,9 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-def _save_conversation_record(customer_id: str, conversation_id: str, summary: str, transcript: str) -> None:
+def _save_conversation_record(
+    customer_id: str, conversation_id: str, summary: str, transcript: str, interaction_type: str = "transcript"
+) -> None:
     from backend_v3.graph_store.neo4j_client import run_write
 
     today = datetime.now(timezone.utc).date().isoformat()
@@ -27,15 +29,22 @@ def _save_conversation_record(customer_id: str, conversation_id: str, summary: s
     run_write(
         "MATCH (c:Customer {customer_id: $customer_id}) "
         "MERGE (conv:Conversation {conversation_id: $conversation_id}) "
-        "SET conv.date = $today, conv.summary = $summary, conv.transcript_excerpt = $excerpt "
+        "SET conv.date = $today, conv.summary = $summary, conv.transcript_excerpt = $excerpt, "
+        "    conv.interaction_type = $interaction_type "
         "MERGE (c)-[:HAD_CONVERSATION]->(conv)",
-        {"customer_id": customer_id, "conversation_id": conversation_id, "today": today, "summary": summary, "excerpt": excerpt},
+        {
+            "customer_id": customer_id, "conversation_id": conversation_id, "today": today,
+            "summary": summary, "excerpt": excerpt, "interaction_type": interaction_type,
+        },
     )
 
 
-def ingest_conversation(customer_id: str, transcript: str) -> dict[str, Any]:
-    """The Milestone 2 entry point: upload a transcript, get back a
-    processing result with proposed memories awaiting advisor approval."""
+def ingest_conversation(customer_id: str, transcript: str, interaction_type: str = "transcript") -> dict[str, Any]:
+    """The Milestone 2 entry point: upload a transcript (or Stage 3 meeting
+    notes — same extraction pipeline, just labelled differently so Meeting
+    History and My Day's "awaiting processing" check can tell them apart),
+    get back a processing result with proposed memories awaiting advisor
+    approval."""
     from backend_v3.advisor.conversation_intelligence import analyze_conversation
     from backend_v3.advisor.memory_model import create_pending_memory
     from backend_v3.advisor.retrieval import get_customer_graph
@@ -44,11 +53,13 @@ def ingest_conversation(customer_id: str, transcript: str) -> dict[str, Any]:
 
     if get_customer_graph(customer_id) is None:
         raise ValueError(f"Customer {customer_id} not found")
+    if interaction_type not in ("transcript", "notes"):
+        raise ValueError("interaction_type must be 'transcript' or 'notes'")
 
     conversation_id = str(uuid.uuid4())
     chunks_stored = store_transcript_chunks(customer_id, conversation_id, transcript)
     analysis = analyze_conversation(transcript)
-    _save_conversation_record(customer_id, conversation_id, analysis["summary"], transcript)
+    _save_conversation_record(customer_id, conversation_id, analysis["summary"], transcript, interaction_type)
 
     proposed = []
     for item in analysis.get("extracted_items", []):

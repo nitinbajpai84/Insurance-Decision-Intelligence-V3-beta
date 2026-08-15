@@ -8,6 +8,7 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock,
+  FileUp,
   Link as LinkIcon,
   RefreshCw,
   Sparkles,
@@ -130,6 +131,100 @@ export default function MyDayPage() {
             </section>
           </div>
 
+          {(day.meetings_requiring_preparation.length > 0 ||
+            day.meetings_awaiting_processing.length > 0 ||
+            day.memory_updates_awaiting_approval.length > 0 ||
+            day.overdue_followups.length > 0) && (
+            <section>
+              <h2 className="text-base font-bold text-gray-900">Meeting lifecycle</h2>
+              <p className="mt-1 text-sm text-gray-500">Before, during, and after — what still needs your attention.</p>
+              <div className="mt-3 grid gap-5 lg:grid-cols-2 xl:grid-cols-4">
+                <LifecyclePanel
+                  title="Requiring Preparation"
+                  count={day.summary.meetings_requiring_preparation}
+                  icon={<Sparkles size={15} className="text-v3-violet" />}
+                >
+                  {day.meetings_requiring_preparation.map((m) => (
+                    <div key={m.meeting_id} className="p-3">
+                      <Link href={`/advisor/customers/${m.customer_id}`} className="text-sm font-semibold text-v3-violet hover:underline">
+                        {m.customer_name}
+                      </Link>
+                      <p className="mt-0.5 text-xs text-gray-500">{m.date} · {m.time_label}</p>
+                      <Link
+                        href={`/advisor/customers/${m.customer_id}/briefing`}
+                        className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-v3-violet hover:underline"
+                      >
+                        Prepare <ArrowRight size={12} />
+                      </Link>
+                    </div>
+                  ))}
+                  {day.meetings_requiring_preparation.length === 0 && <EmptyState text="Everything is prepared." />}
+                </LifecyclePanel>
+
+                <LifecyclePanel
+                  title="Awaiting Processing"
+                  count={day.summary.meetings_awaiting_processing}
+                  icon={<FileUp size={15} className="text-amber-600" />}
+                >
+                  {day.meetings_awaiting_processing.map((m) => (
+                    <div key={m.meeting_id} className="p-3">
+                      <Link href={`/advisor/customers/${m.customer_id}`} className="text-sm font-semibold text-v3-violet hover:underline">
+                        {m.customer_name}
+                      </Link>
+                      <p className="mt-0.5 text-xs text-gray-500">Met {m.date}</p>
+                      <Link
+                        href={`/advisor/customers/${m.customer_id}/conversations/new`}
+                        className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-amber-700 hover:underline"
+                      >
+                        Upload transcript or notes <ArrowRight size={12} />
+                      </Link>
+                    </div>
+                  ))}
+                  {day.meetings_awaiting_processing.length === 0 && <EmptyState text="Nothing waiting on you." />}
+                </LifecyclePanel>
+
+                <LifecyclePanel
+                  title="Memory Updates Pending"
+                  count={day.summary.memory_updates_awaiting_approval}
+                  icon={<CheckCircle2 size={15} className="text-v3-teal" />}
+                >
+                  {day.memory_updates_awaiting_approval.map((m) => (
+                    <div key={m.memory_id} className="p-3">
+                      <p className="text-sm text-gray-900">{m.value}</p>
+                      <Link
+                        href={`/advisor/customers/${m.customer_id}/memory`}
+                        className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-v3-violet hover:underline"
+                      >
+                        {m.customer_name} <ArrowRight size={12} />
+                      </Link>
+                      {m.has_conflict && <p className="mt-1 text-[11px] font-bold uppercase text-amber-700">Conflict</p>}
+                    </div>
+                  ))}
+                  {day.memory_updates_awaiting_approval.length === 0 && <EmptyState text="No proposals waiting." />}
+                </LifecyclePanel>
+
+                <LifecyclePanel
+                  title="Overdue Follow-Ups"
+                  count={day.summary.overdue_followups}
+                  icon={<Clock size={15} className="text-v3-rose" />}
+                >
+                  {day.overdue_followups.map((f) => (
+                    <div key={f.followup_id} className="p-3">
+                      <p className="text-sm text-gray-900">{f.title}</p>
+                      <div className="mt-1 flex items-center justify-between gap-2">
+                        <Link href={`/advisor/customers/${f.customer_id}`} className="text-xs font-bold text-v3-violet hover:underline">
+                          {f.customer_name}
+                        </Link>
+                        <span className="text-[11px] font-bold text-v3-rose">Due {f.due_date}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {day.overdue_followups.length === 0 && <EmptyState text="Nothing overdue." />}
+                </LifecyclePanel>
+              </div>
+            </section>
+          )}
+
           <div className="grid gap-5 lg:grid-cols-3">
             <MiniPanel title="New Customer Events" items={day.new_customer_events} empty="No recent life events." />
             <MiniPanel title="High-Priority Customers" items={day.high_priority_customers} empty="No high-priority customers." />
@@ -156,6 +251,30 @@ export default function MyDayPage() {
         </>
       )}
     </div>
+  );
+}
+
+function LifecyclePanel({
+  title,
+  count,
+  icon,
+  children
+}: {
+  title: string;
+  count: number;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-lg border border-gray-100 bg-white shadow-card">
+      <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+        <span className="inline-flex items-center gap-1.5 text-sm font-bold text-gray-900">
+          {icon} {title}
+        </span>
+        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-bold text-gray-600">{count}</span>
+      </div>
+      <div className="max-h-72 divide-y divide-gray-100 overflow-y-auto">{children}</div>
+    </section>
   );
 }
 

@@ -20,12 +20,13 @@ export default function NewConversationPage({ params }: { params: Promise<{ cust
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [fileName, setFileName] = useState("");
+  const [sourceType, setSourceType] = useState<"transcript" | "notes">("transcript");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function onFileSelected(file: File) {
     setError("");
-    if (!file.name.toLowerCase().endsWith(".txt")) {
-      setError("Only .txt transcript files are supported right now.");
+    if (!/\.(txt|md)$/i.test(file.name)) {
+      setError("Only plain text (.txt) or Markdown (.md) files are supported right now.");
       return;
     }
     const text = await file.text();
@@ -37,7 +38,7 @@ export default function NewConversationPage({ params }: { params: Promise<{ cust
     setProcessing(true);
     setError("");
     try {
-      const res = await advisorApi.uploadConversation(customerId, transcript);
+      const res = await advisorApi.uploadConversation(customerId, transcript, sourceType);
       setResult(res);
       setMemories(res.proposed_memories);
     } catch (e: any) {
@@ -66,24 +67,39 @@ export default function NewConversationPage({ params }: { params: Promise<{ cust
 
       <div>
         <p className="text-xs font-bold uppercase tracking-wide text-v3-violet">Conversation capture</p>
-        <h1 className="mt-1 text-2xl font-bold text-gray-900">Upload meeting transcript</h1>
+        <h1 className="mt-1 text-2xl font-bold text-gray-900">Capture a meeting</h1>
       </div>
 
       {!result && (
         <section className="rounded-xl border border-gray-100 bg-white p-5 shadow-card">
+          <div className="mb-3 inline-flex rounded-lg border border-gray-200 p-1">
+            {(["transcript", "notes"] as const).map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setSourceType(type)}
+                className={`rounded-md px-3 py-1.5 text-xs font-bold uppercase ${
+                  sourceType === type ? "bg-v3-violet text-white" : "text-gray-500 hover:text-v3-violet"
+                }`}
+              >
+                {type === "transcript" ? "Transcript" : "Meeting notes"}
+              </button>
+            ))}
+          </div>
+
           <div className="mb-3 flex items-center gap-3">
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-bold text-gray-700 hover:border-v3-violet hover:text-v3-violet"
             >
-              <FileUp size={14} /> Upload .txt file
+              <FileUp size={14} /> Upload file
             </button>
             {fileName && <span className="text-xs text-gray-500">Loaded: {fileName}</span>}
             <input
               ref={fileInputRef}
               type="file"
-              accept=".txt,text/plain"
+              accept=".txt,.md,text/plain,text/markdown"
               className="hidden"
               onChange={(e) => e.target.files?.[0] && onFileSelected(e.target.files[0])}
             />
@@ -91,7 +107,11 @@ export default function NewConversationPage({ params }: { params: Promise<{ cust
           <textarea
             value={transcript}
             onChange={(e) => setTranscript(e.target.value)}
-            placeholder="Paste the meeting transcript here, or upload a .txt file above…"
+            placeholder={
+              sourceType === "transcript"
+                ? "Paste the meeting transcript here, or upload a file above…"
+                : "Type or paste your meeting notes here, or upload a file above…"
+            }
             rows={14}
             className="w-full rounded-lg border border-gray-200 p-3 text-sm outline-none focus:border-v3-violet focus:ring-2 focus:ring-v3-violet/20"
           />
@@ -174,10 +194,22 @@ function MemoryCard({
         )}
       </div>
 
-      {memory.has_conflict && (
-        <p className="mt-2 flex items-start gap-1 text-xs font-semibold text-amber-700">
-          <AlertTriangle size={13} className="mt-0.5 shrink-0" /> Possible conflict with existing record: &ldquo;{memory.conflict_with}&rdquo;
-        </p>
+      {memory.has_conflict && !decided && (
+        <div className="mt-2 rounded-lg border border-amber-300 bg-amber-100 p-2.5">
+          <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+            <AlertTriangle size={12} /> Conflict detected
+          </p>
+          <div className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
+            <div>
+              <p className="text-[10px] font-bold uppercase text-amber-700">Existing</p>
+              <p className="text-sm text-amber-900">{memory.conflict_with}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase text-amber-700">New</p>
+              <p className="text-sm text-amber-900">{memory.value}</p>
+            </div>
+          </div>
+        </div>
       )}
 
       {editing ? (
@@ -188,20 +220,32 @@ function MemoryCard({
           className="mt-2 w-full rounded-lg border border-gray-200 p-2 text-sm outline-none focus:border-v3-violet"
         />
       ) : (
-        <p className="mt-2 text-sm font-medium text-gray-900">{memory.value}</p>
+        !memory.has_conflict && <p className="mt-2 text-sm font-medium text-gray-900">{memory.value}</p>
       )}
 
       <p className="mt-2 text-xs italic text-gray-500">Evidence: &ldquo;{memory.evidence}&rdquo;</p>
       <p className="mt-0.5 text-[11px] text-gray-400">Confidence: {Math.round(memory.confidence * 100)}%</p>
 
       {!decided && (
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           {editing ? (
             <>
               <button onClick={onAcceptEdit} className="inline-flex items-center gap-1 rounded-lg bg-v3-violet px-3 py-1.5 text-xs font-bold text-white hover:bg-v3-violetDark">
                 <Check size={13} /> Save & Accept
               </button>
               <button onClick={onCancelEdit} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+            </>
+          ) : memory.has_conflict ? (
+            <>
+              <button onClick={onAccept} className="inline-flex items-center gap-1 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-green-700">
+                <Check size={13} /> Accept new
+              </button>
+              <button onClick={onReject} className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50">
+                <X size={13} /> Keep existing
+              </button>
+              <button onClick={onStartEdit} className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50">
+                <Pencil size={13} /> Edit
+              </button>
             </>
           ) : (
             <>

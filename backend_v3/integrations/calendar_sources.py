@@ -28,6 +28,12 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from backend_v3.integrations.models import NormalizedMeeting, Provenance
 
+# CN= carries the attendee's display name (e.g. ATTENDEE;CN=John Kemp:mailto:...).
+# Losing it means a customer with no email on file — common for seeded or
+# manually-entered records — can never even produce a name candidate for
+# "Customer match required." to work with.
+_CN_PATTERN = re.compile(r'CN=([^;:]+)', re.I)
+
 
 class NotConnected(RuntimeError):
     """The provider has no usable credential, so there is nothing to read."""
@@ -147,8 +153,13 @@ def parse_ics(content: bytes | str, filename: str = "calendar.ics") -> list[Norm
             current["ends_at"] = _parse_ics_datetime(value, params)
         elif name == "ATTENDEE":
             address = re.sub(r"^mailto:", "", value.strip(), flags=re.I)
+            display_name = params.get("CN", "").strip()
             if address:
-                current["attendees"].append(address)
+                # "Name <email>" is the format resolve_identity already
+                # knows how to split — carrying the CN through means a
+                # customer with no email on file can still produce a name
+                # candidate instead of no match at all.
+                current["attendees"].append(f"{display_name} <{address}>" if display_name else address)
         elif name == "ORGANIZER":
             current["organizer"] = re.sub(r"^mailto:", "", value.strip(), flags=re.I)
 

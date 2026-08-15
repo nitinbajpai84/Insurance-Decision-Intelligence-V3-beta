@@ -124,8 +124,13 @@ def connection_center() -> list[dict[str, Any]]:
 
 
 def start_connect(provider_key: str) -> dict[str, Any]:
-    """Begin a connection. OAuth providers return an authorization URL;
-    file providers are told to upload instead."""
+    """Begin a connection.
+
+    Most providers belong to an account (Google/Microsoft/Meta), so the
+    caller is redirected to that account's flow rather than starting a
+    second consent for the same credential.
+    """
+    from backend_v3.integrations.accounts import account_for_capability
     from backend_v3.integrations.registry import get_provider
 
     provider = get_provider(provider_key)
@@ -143,29 +148,56 @@ def start_connect(provider_key: str) -> dict[str, Any]:
             "so it cannot be connected."
         )
 
-    from backend_v3.integrations.oauth import build_authorization_url
+    account = account_for_capability(provider_key)
+    if account is not None:
+        return {
+            "provider": provider_key,
+            "mode": "account",
+            "account": account.key,
+            "message": f"{provider.name} is enabled by connecting your {account.name} account.",
+        }
 
-    return {"provider": provider_key, "mode": "oauth2", **build_authorization_url(provider_key)}
+    if provider_key.startswith("crm_"):
+        return {"provider": provider_key, "mode": "crm", "vendor": provider_key.replace("crm_", "", 1)}
+
+    raise RuntimeError(f"{provider.name} has no connect flow.")
 
 
 def disconnect_provider(provider_key: str) -> dict[str, Any]:
-    """Revoke credentials and drop the connection record together."""
+    """Drop a single capability's connection record.
+
+    Credentials are owned by the account, so disconnecting one capability
+    does not destroy a token its siblings still use — disconnecting the
+    account does that.
+    """
     from backend_v3.integrations.connection_store import disconnect
     from backend_v3.integrations.registry import get_provider
 
-    provider = get_provider(provider_key)
-    revocation: dict[str, Any] = {"upstream_revocation": "not_applicable", "local_credentials_removed": False}
+    get_provider(provider_key)
+    disconnect(provider_key)
 
-    if provider.auth == "oauth2":
-        from backend_v3.integrations.oauth import revoke
+    if provider_key.startswith("crm_"):
+        from backend_v3.integrations.token_store import revoke_token
 
         try:
-            revocation = revoke(provider_key)
-        except Exception as exc:
-            revocation = {"upstream_revocation": f"failed_{type(exc).__name__}", "local_credentials_removed": False}
+            revoke_token(provider_key)
+        except Exception:
+            pass
 
-    disconnect(provider_key)
-    return {"provider": provider_key, "status": "not_connected", **revocation}
+    return {"provider": provider_key, "status": "not_connected"}
+
+
+# provider key -> the function that actually pulls its data.
+_SYNC_ROUTES: dict[str, str] = {
+    "google_calendar": "calendar",
+    "outlook_calendar": "calendar",
+    "gmail": "gmail",
+    "google_drive": "google_drive",
+    "m365_email": "m365_email",
+    "onedrive": "onedrive",
+    "sharepoint": "sharepoint",
+    "teams": "teams",
+}
 
 
 def sync_provider(provider_key: str) -> dict[str, Any]:
@@ -173,11 +205,41 @@ def sync_provider(provider_key: str) -> dict[str, Any]:
     from backend_v3.integrations.registry import get_provider
 
     provider = get_provider(provider_key)
+    route = _SYNC_ROUTES.get(provider_key)
 
-    if provider_key in ("google_calendar", "outlook_calendar"):
+    if route == "calendar":
         from backend_v3.integrations.calendar_sources import sync_calendar
 
         return sync_calendar(provider_key)
+    if route == "gmail":
+        from backend_v3.integrations.google_sources import sync_gmail
+
+        return sync_gmail()
+    if route == "google_drive":
+        from backend_v3.integrations.google_sources import sync_google_drive
+
+        return sync_google_drive()
+    if route == "m365_email":
+        from backend_v3.integrations.microsoft_sources import sync_m365_email
+
+        return sync_m365_email()
+    if route == "onedrive":
+        from backend_v3.integrations.microsoft_sources import sync_onedrive
+
+        return sync_onedrive()
+    if route == "sharepoint":
+        from backend_v3.integrations.microsoft_sources import sync_sharepoint
+
+        return sync_sharepoint()
+    if route == "teams":
+        from backend_v3.integrations.microsoft_sources import sync_teams
+
+        return sync_teams()
+
+    if provider_key.startswith("crm_"):
+        from backend_v3.integrations.crm_sources import sync_crm
+
+        return sync_crm(provider_key)
 
     if provider.auth == "file_upload":
         raise RuntimeError(f"{provider.name} syncs by uploading a new file rather than on demand.")

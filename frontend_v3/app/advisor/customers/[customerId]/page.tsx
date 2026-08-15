@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
-import { AlertTriangle, ArrowRight, Brain, CalendarClock, Clock, FileText, ShieldCheck, Sparkles, Upload, Users } from "lucide-react";
+import { AlertTriangle, ArrowRight, Brain, CalendarClock, Clock, FileText, History, ShieldCheck, Sparkles, Upload, Users } from "lucide-react";
 import { advisorApi, money, type Customer360 } from "@/services/advisorApi";
 
 const PRIORITY_TONE: Record<string, string> = {
@@ -40,6 +40,9 @@ export default function CustomerProfilePage({ params }: { params: Promise<{ cust
             </Link>
             <Link href={`/advisor/customers/${customerId}/memory`} className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2.5 text-sm font-bold text-white hover:bg-white/20">
               <Clock size={16} /> Memory
+            </Link>
+            <Link href={`/advisor/customers/${customerId}/meeting-history`} className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2.5 text-sm font-bold text-white hover:bg-white/20">
+              <History size={16} /> Meeting History
             </Link>
             <Link href={`/advisor/customers/${customerId}/briefing`} className="inline-flex items-center gap-2 rounded-lg bg-v3-violet px-4 py-2.5 text-sm font-bold text-white shadow-glow hover:bg-v3-violetDark">
               <Sparkles size={16} /> Prepare for Meeting <ArrowRight size={16} />

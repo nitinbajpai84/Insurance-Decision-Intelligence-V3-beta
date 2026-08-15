@@ -21,7 +21,8 @@ UNKNOWN_CUSTOMER_ID = "cust_does_not_exist"
 # shape tests generate — a known prefix followed by a bare UUID — so real
 # customer data can never match it.
 _TEST_VALUE_PATTERN = (
-    r"^(test memory|rejected need|approved need|edited|life event|preference|concern|goal|need) "
+    r"^(test memory|test follow-up promotion|test followup|rejected need|approved need|"
+    r"edited|life event|preference|concern|goal|need) "
     r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 )
 

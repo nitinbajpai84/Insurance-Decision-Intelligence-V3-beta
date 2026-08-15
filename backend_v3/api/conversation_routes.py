@@ -18,6 +18,7 @@ router = APIRouter(prefix="/advisor", tags=["advisor-memory"])
 
 class TranscriptIn(BaseModel):
     transcript: str
+    interaction_type: str = "transcript"
 
 
 class ApproveIn(BaseModel):
@@ -31,7 +32,7 @@ def upload_conversation(customer_id: str, body: TranscriptIn):
     if not body.transcript or not body.transcript.strip():
         raise HTTPException(400, "Transcript is empty")
     try:
-        result = ingest_conversation(customer_id, body.transcript)
+        result = ingest_conversation(customer_id, body.transcript, interaction_type=body.interaction_type)
     except ValueError as exc:
         raise HTTPException(404, str(exc))
     except Exception as exc:
