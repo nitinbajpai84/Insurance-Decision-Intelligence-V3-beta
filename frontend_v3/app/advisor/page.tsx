@@ -2,8 +2,18 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { AlertTriangle, ArrowRight, CalendarDays, CheckCircle2, Clock, RefreshCw, Sparkles, UserRoundCheck } from "lucide-react";
-import { advisorApi, type CustomerListItem, type MyDay } from "@/services/advisorApi";
+import {
+  AlertTriangle,
+  ArrowRight,
+  CalendarDays,
+  CheckCircle2,
+  Clock,
+  Link as LinkIcon,
+  RefreshCw,
+  Sparkles,
+  UserRoundCheck
+} from "lucide-react";
+import { advisorApi, type CalendarMeeting, type CustomerListItem, type MyDay } from "@/services/advisorApi";
 
 const PRIORITY_TONE: Record<string, string> = {
   high: "bg-v3-rose/10 text-v3-rose",
@@ -59,8 +69,23 @@ export default function MyDayPage() {
 
       {day && (
         <>
+          {day.calendar_meetings_today.length > 0 && (
+            <section className="rounded-lg border border-v3-teal/20 bg-v3-teal/5 px-5 py-4">
+              <p className="text-lg font-bold text-gray-900">{day.meetings_message}</p>
+              {day.summary.unmatched_meetings > 0 && (
+                <p className="mt-1 text-sm text-amber-700">
+                  {day.summary.unmatched_meetings} calendar entr
+                  {day.summary.unmatched_meetings === 1 ? "y needs" : "ies need"} a customer match.{" "}
+                  <Link href="/advisor/meetings/match" className="font-bold underline">
+                    Resolve now
+                  </Link>
+                </p>
+              )}
+            </section>
+          )}
+
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Meetings today" value={day.summary.meetings_today} icon={<CalendarDays size={17} className="text-v3-teal" />} />
+            <StatCard label="Customer meetings today" value={day.summary.customer_meetings_today} icon={<CalendarDays size={17} className="text-v3-teal" />} />
             <StatCard label="Need attention" value={day.summary.customers_requiring_attention} icon={<AlertTriangle size={17} className="text-v3-rose" />} />
             <StatCard label="Pending follow-ups" value={day.summary.pending_followups} icon={<CheckCircle2 size={17} className="text-v3-violet" />} />
             <StatCard label="Stale info" value={day.summary.stale_customer_information} icon={<Clock size={17} className="text-amber-600" />} />
@@ -78,20 +103,29 @@ export default function MyDayPage() {
             </section>
 
             <section className="rounded-lg border border-gray-100 bg-white shadow-card">
-              <PanelHeader title="Today's Meetings" subtitle="Calendar integrations are not connected yet." />
+              <PanelHeader
+                title="Today's Meetings"
+                subtitle={
+                  day.calendar_meetings_today.length > 0
+                    ? day.meetings_message
+                    : "Connect a calendar or import an .ics file to see today's schedule."
+                }
+              />
               <div className="divide-y divide-gray-100">
-                {day.meetings_today.map((meeting) => (
-                  <div key={`${meeting.customer_id}-${meeting.date}`} className="p-4">
-                    <Link href={`/advisor/customers/${meeting.customer_id}`} className="font-semibold text-v3-violet hover:underline">
-                      {meeting.customer_name}
-                    </Link>
-                    <p className="mt-1 text-sm text-gray-600">{meeting.summary}</p>
-                    <Link href={`/advisor/customers/${meeting.customer_id}/briefing`} className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-v3-violet hover:underline">
-                      Prepare briefing <ArrowRight size={13} />
+                {day.calendar_meetings_today.map((meeting) => (
+                  <MeetingRow key={meeting.meeting_id} meeting={meeting} />
+                ))}
+                {day.calendar_meetings_today.length === 0 && (
+                  <div className="p-4">
+                    <p className="text-sm text-gray-400">No calendar meetings for today.</p>
+                    <Link
+                      href="/advisor/connections"
+                      className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-v3-violet hover:underline"
+                    >
+                      Open Connection Center <ArrowRight size={13} />
                     </Link>
                   </div>
-                ))}
-                {day.meetings_today.length === 0 && <EmptyState text="No meetings are scheduled for today." />}
+                )}
               </div>
             </section>
           </div>
@@ -121,6 +155,61 @@ export default function MyDayPage() {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function MeetingRow({ meeting }: { meeting: CalendarMeeting }) {
+  const matched = meeting.match_status === "matched";
+  return (
+    <div className="p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        {matched && meeting.customer_id ? (
+          <Link href={`/advisor/customers/${meeting.customer_id}`} className="font-semibold text-v3-violet hover:underline">
+            {meeting.customer_name}
+          </Link>
+        ) : (
+          <span className="font-semibold text-gray-900">{meeting.title}</span>
+        )}
+        <span className="text-sm font-bold text-gray-700">{meeting.time_label}</span>
+      </div>
+
+      <p className="mt-1 text-xs text-gray-500">{meeting.source_label}</p>
+      <p className={`mt-1 text-xs font-semibold ${matched ? "text-v3-teal" : "text-amber-700"}`}>
+        {meeting.match_label}
+      </p>
+      {matched && <p className="mt-1 text-sm text-gray-600">{meeting.title}</p>}
+
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        {matched && meeting.customer_id ? (
+          // Preparation stays an explicit action — opening My Day never
+          // generates a briefing on its own.
+          <Link
+            href={`/advisor/customers/${meeting.customer_id}/briefing`}
+            className="inline-flex items-center gap-1 rounded-lg bg-v3-violet px-3 py-1.5 text-xs font-bold text-white hover:bg-v3-violetDark"
+          >
+            <Sparkles size={13} /> Prepare for meeting
+          </Link>
+        ) : (
+          <Link
+            href="/advisor/meetings/match"
+            className="inline-flex items-center gap-1 rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-50"
+          >
+            <UserRoundCheck size={13} /> Match customer
+          </Link>
+        )}
+        {meeting.meeting_link && (
+          <a
+            href={meeting.meeting_link}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-xs font-bold text-v3-violet hover:underline"
+          >
+            <LinkIcon size={12} /> Join
+          </a>
+        )}
+        {meeting.location && <span className="text-xs text-gray-500">{meeting.location}</span>}
+      </div>
     </div>
   );
 }

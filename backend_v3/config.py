@@ -54,6 +54,31 @@ NEO4J_DATABASE: str = _str("NEO4J_DATABASE", "neo4j")
 QDRANT_URL: str = _str("QDRANT_URL", "")
 QDRANT_API_KEY: str = _str("QDRANT_API_KEY", "")
 
+# --- Integrations (Stage 2) --------------------------------------------------
+# Fernet key protecting stored OAuth tokens. Generate with:
+#   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Without it, OAuth providers refuse to connect rather than store a token
+# in plaintext (see integrations/token_store.py).
+INTEGRATION_ENCRYPTION_KEY: str = _str("INTEGRATION_ENCRYPTION_KEY", "")
+
+# OAuth client credentials. A provider stays not_connected until its pair
+# is present — registry.Provider.missing_config() reports which are absent.
+GOOGLE_OAUTH_CLIENT_ID: str = _str("GOOGLE_OAUTH_CLIENT_ID", "")
+GOOGLE_OAUTH_CLIENT_SECRET: str = _str("GOOGLE_OAUTH_CLIENT_SECRET", "")
+MS_OAUTH_CLIENT_ID: str = _str("MS_OAUTH_CLIENT_ID", "")
+MS_OAUTH_CLIENT_SECRET: str = _str("MS_OAUTH_CLIENT_SECRET", "")
+MS_OAUTH_TENANT: str = _str("MS_OAUTH_TENANT", "common")
+OAUTH_REDIRECT_BASE: str = _str("OAUTH_REDIRECT_BASE", "http://127.0.0.1:3011")
+
+# Timezone meeting times are displayed in. Calendars deliver UTC (or an
+# explicit offset); the advisor reads their own local clock, so rendering
+# raw UTC would show a 10:00 SGT meeting as 02:00.
+DISPLAY_TIMEZONE: str = _str("DISPLAY_TIMEZONE", "Asia/Singapore")
+
+# How long raw communication content may be retained after ingestion.
+# Email/chat bodies past this age are dropped; derived summaries persist.
+COMMUNICATION_RETENTION_DAYS: int = _int("COMMUNICATION_RETENTION_DAYS", 90)
+
 # --- API ----------------------------------------------------------------------
 API_PORT: int = _int("API_PORT", 3011)
 _cors_env = _str("CORS_ORIGINS", "")

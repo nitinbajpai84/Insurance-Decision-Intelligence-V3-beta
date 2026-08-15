@@ -81,6 +81,28 @@ def connections():
     return list_connections()
 
 
+@router.get("/meetings/today")
+def meetings_today():
+    """Today's calendar meetings plus the customer-meeting count line."""
+    from backend_v3.advisor.meeting_service import today_summary
+
+    try:
+        return today_summary()
+    except Exception as exc:
+        raise HTTPException(503, f"Could not read today's meetings: {type(exc).__name__}: {exc}")
+
+
+@router.get("/meetings/unmatched")
+def meetings_unmatched():
+    """Meetings whose attendees did not resolve to a customer."""
+    from backend_v3.advisor.meeting_service import list_unmatched_meetings
+
+    try:
+        return list_unmatched_meetings()
+    except Exception as exc:
+        raise HTTPException(503, f"Could not read unmatched meetings: {type(exc).__name__}: {exc}")
+
+
 @router.get("/onboarding/result")
 def onboarding_result():
     from backend_v3.advisor.agent_service import get_onboarding_result

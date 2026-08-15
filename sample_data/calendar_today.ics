@@ -1,0 +1,68 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Advisor Intelligence//Stage 2 sample//EN
+CALSCALE:GREGORIAN
+BEGIN:VEVENT
+UID:adv-meeting-0001@example.com
+SUMMARY:Portfolio review with Marcus Tan
+DTSTART:20260815T020000Z
+DTEND:20260815T030000Z
+ORGANIZER:mailto:nitin.bajpai@example.com
+ATTENDEE;CN=Marcus Tan:mailto:marcus.tan@example.com
+LOCATION:Level 12 Meeting Room A
+STATUS:CONFIRMED
+DESCRIPTION:Annual portfolio review and protection gap discussion.
+END:VEVENT
+BEGIN:VEVENT
+UID:adv-meeting-0002@example.com
+SUMMARY:Education funding discussion with Priya Raman
+DTSTART:20260815T033000Z
+DTEND:20260815T043000Z
+ORGANIZER:mailto:nitin.bajpai@example.com
+ATTENDEE;CN=Priya Raman:mailto:priya.raman@example.com
+STATUS:CONFIRMED
+DESCRIPTION:Review education savings plan. Join at https://meet.google.com/adv-priya-review
+END:VEVENT
+BEGIN:VEVENT
+UID:adv-meeting-0003@example.com
+SUMMARY:Retirement income planning with Samuel Wee
+DTSTART:20260815T060000Z
+DTEND:20260815T070000Z
+ORGANIZER:mailto:nitin.bajpai@example.com
+ATTENDEE;CN=Samuel Wee:mailto:samuel.wee@example.com
+LOCATION:Client office
+STATUS:CONFIRMED
+DESCRIPTION:Pre-retirement income adequacy review.
+END:VEVENT
+BEGIN:VEVENT
+UID:adv-meeting-0004@example.com
+SUMMARY:Coverage review with Farah Ismail
+DTSTART:20260815T073000Z
+DTEND:20260815T083000Z
+ORGANIZER:mailto:nitin.bajpai@example.com
+ATTENDEE;CN=Farah Ismail:mailto:farah.ismail@example.com
+STATUS:CONFIRMED
+DESCRIPTION:Reassess coverage following promotion. https://zoom.us/j/9876543210
+END:VEVENT
+BEGIN:VEVENT
+UID:adv-meeting-0005@example.com
+SUMMARY:Property and protection planning with Grace Lim
+DTSTART:20260815T090000Z
+DTEND:20260815T100000Z
+ORGANIZER:mailto:nitin.bajpai@example.com
+ATTENDEE;CN=Grace Lim:mailto:grace.lim@example.com
+LOCATION:Level 12 Meeting Room B
+STATUS:CONFIRMED
+DESCRIPTION:First property purchase and mortgage protection.
+END:VEVENT
+BEGIN:VEVENT
+UID:adv-meeting-0006@example.com
+SUMMARY:Intro call with prospective client
+DTSTART:20260815T103000Z
+DTEND:20260815T110000Z
+ORGANIZER:mailto:nitin.bajpai@example.com
+ATTENDEE;CN=Jordan Referral:mailto:jordan.referral@example.com
+STATUS:CONFIRMED
+DESCRIPTION:Referral introduction call - not yet a customer record.
+END:VEVENT
+END:VCALENDAR

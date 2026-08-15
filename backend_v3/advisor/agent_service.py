@@ -62,6 +62,25 @@ def _build_followups(customers: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return followups
 
 
+def _calendar_meetings() -> dict[str, list[dict[str, Any]]]:
+    """Stage 2 calendar meetings. A calendar that is not connected simply
+    contributes nothing — it must never break My Day."""
+    try:
+        from backend_v3.advisor.meeting_service import (
+            list_meetings_for_date,
+            list_unmatched_meetings,
+            list_upcoming_meetings,
+        )
+
+        return {
+            "today": list_meetings_for_date(),
+            "upcoming": list_upcoming_meetings(),
+            "unmatched": list_unmatched_meetings(),
+        }
+    except Exception:
+        return {"today": [], "upcoming": [], "unmatched": []}
+
+
 def get_my_day() -> dict[str, Any]:
     from backend_v3.advisor.customer_service import list_customer_summaries
     from backend_v3.advisor.customer_graph_service import list_customer_relationship_summaries
@@ -69,6 +88,7 @@ def get_my_day() -> dict[str, Any]:
     customers = list_customer_summaries()
     relationship_rows = list_customer_relationship_summaries()
     today_iso = TODAY.isoformat()
+    calendar = _calendar_meetings()
 
     meetings_today: list[dict[str, Any]] = []
     upcoming_meetings: list[dict[str, Any]] = []
@@ -99,11 +119,45 @@ def get_my_day() -> dict[str, Any]:
 
     pending_followups = _build_followups(customers)
 
+    # Calendar meetings lead the list — they are the actual schedule.
+    # Each is given the Stage 1 keys as well as its calendar fields so
+    # existing consumers keep working while new UI can use the extras.
+    calendar_today = [
+        {
+            "customer_id": m["customer_id"],
+            "customer_name": m["customer_name"],
+            "date": m["date"],
+            "summary": m["title"],
+            **m,
+        }
+        for m in calendar["today"]
+    ]
+    calendar_upcoming = [
+        {
+            "customer_id": m["customer_id"],
+            "customer_name": m["customer_name"],
+            "date": m["date"],
+            "summary": m["title"],
+            **m,
+        }
+        for m in calendar["upcoming"]
+    ]
+    meetings_today = calendar_today + meetings_today
+    upcoming_meetings = calendar_upcoming + upcoming_meetings
+    matched_today = [m for m in calendar["today"] if m["match_status"] == "matched"]
+
     return {
         "today": today_iso,
+        "calendar_meetings_today": calendar_today,
+        "unmatched_meetings": calendar["unmatched"],
+        # The success-test line. Counts meetings actually resolved to a
+        # customer; an unmatched calendar entry is not yet one.
+        "meetings_message": f"You have {len(matched_today)} customer meetings today.",
         "summary": {
             "customers": len(customers),
             "meetings_today": len(meetings_today),
+            "customer_meetings_today": len(matched_today),
+            "unmatched_meetings": len(calendar["unmatched"]),
             "upcoming_meetings": len(upcoming_meetings),
             "customers_requiring_attention": len(attention),
             "pending_followups": len(pending_followups),

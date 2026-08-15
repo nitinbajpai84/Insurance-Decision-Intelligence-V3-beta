@@ -6,3 +6,10 @@ neo4j
 qdrant-client
 google-genai
 duckdb
+httpx
+cryptography
+# IANA timezone database. Windows ships none, and slim Linux images often
+# drop theirs, so meeting times would silently render in UTC without it.
+tzdata
+# Optional .xlsx import path; CSV import works without it.
+openpyxl
