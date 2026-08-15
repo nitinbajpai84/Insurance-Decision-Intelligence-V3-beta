@@ -57,6 +57,43 @@ def store_transcript_chunks(customer_id: str, conversation_id: str, transcript: 
     return len(points)
 
 
+def count_conversation_chunks_by_customer() -> dict[str, int]:
+    """How many stored chunks each customer has, for callers (priority
+    scoring's fleet-wide pass) that need presence/volume across every
+    customer without N embedding calls and N semantic searches.
+
+    One scroll through the collection's payloads — no vectors, no
+    per-customer round trip, no embedding model call at all, since a
+    plain count needs no query vector.
+    """
+    from backend_v3.vector_store.qdrant_client import get_client
+
+    counts: dict[str, int] = {}
+    try:
+        client = get_client()
+        offset = None
+        while True:
+            points, offset = client.scroll(
+                collection_name=CONVERSATIONS_COLLECTION,
+                limit=500,
+                offset=offset,
+                with_payload=["customer_id"],
+                with_vectors=False,
+            )
+            for point in points:
+                customer_id = (point.payload or {}).get("customer_id")
+                if customer_id:
+                    counts[customer_id] = counts.get(customer_id, 0) + 1
+            if offset is None:
+                break
+    except Exception:
+        # A collection that doesn't exist yet (fresh environment) or a
+        # Qdrant outage must not break a fleet-wide priority pass —
+        # every customer just falls back to a 0 count.
+        return {}
+    return counts
+
+
 def get_relevant_conversation_memory(customer_id: str, query_text: str | None = None, limit: int = 5) -> list[dict[str, Any]]:
     from backend_v3.ingestion.ocr import embed_text
     from backend_v3.vector_store.qdrant_client import search

@@ -54,6 +54,43 @@ def test_score_all_customers_is_sorted_descending():
     assert values == sorted(values, reverse=True)
 
 
+def test_score_all_customers_responds_quickly():
+    """score_all_customers() used to call score_customer() per customer,
+    each doing a Qdrant semantic search — 20 sequential embed+search
+    round trips for one fleet-wide ranking. It now does a handful of
+    bulk queries plus one Qdrant scroll regardless of customer count."""
+    import time
+
+    start = time.monotonic()
+    res = client.get("/api/v3/advisor/priority")
+    elapsed = time.monotonic() - start
+
+    assert res.status_code == 200
+    assert elapsed < 5, f"Fleet-wide priority took {elapsed:.1f}s — expected bulk queries, not O(customers)"
+
+
+def test_bulk_scores_agree_with_the_authoritative_single_customer_score():
+    """The fast fleet-wide pass must produce the exact same score and
+    reasons as score_customer()'s authoritative, Qdrant-backed
+    computation for every customer — a caught regression: an earlier
+    version counted Neo4j :HAD_CONVERSATION relationships instead of
+    Qdrant chunks, which undercounted engagement for every seeded
+    customer (their conversation memory has no matching Neo4j node) and
+    silently changed several customers' scores and priority tier."""
+    from backend_v3.advisor.priority_service import score_all_customers, score_customer
+
+    bulk_by_id = {c["customer_id"]: c for c in score_all_customers()}
+    checked = 0
+    for customer_id, bulk_score in bulk_by_id.items():
+        authoritative = score_customer(customer_id)
+        assert bulk_score["score"] == authoritative["score"], (
+            f"{authoritative['name']}: bulk={bulk_score['score']} authoritative={authoritative['score']}"
+        )
+        assert bulk_score["priority"] == authoritative["priority"]
+        checked += 1
+    assert checked >= 10
+
+
 def test_priority_api_endpoint():
     res = client.get(f"/api/v3/advisor/customers/{KNOWN_CUSTOMER_ID}/priority")
     assert res.status_code == 200
