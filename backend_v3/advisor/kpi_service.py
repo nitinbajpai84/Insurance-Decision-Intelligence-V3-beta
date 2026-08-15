@@ -52,37 +52,90 @@ def _agent_kpis() -> dict[str, Any]:
 
 
 def _customer_kpis() -> dict[str, Any]:
+    """Aggregate coverage/freshness across every customer in two queries
+    total, not two per customer.
+
+    The original version called compute_coverage()/compute_freshness()
+    in a loop — each of those does 5-6 Neo4j round trips, a Qdrant
+    semantic search, and 2 DuckDB queries for one customer's *authoritative*
+    view (correct, and still what Customer 360 uses). For a fleet-wide
+    average, presence-in-the-graph is the same real signal without the
+    per-customer network cost, so this reimplements the same nine
+    categories and the same freshness threshold as bulk Cypher instead.
+    """
     from backend_v3.advisor.customer_service import list_customer_summaries
-    from backend_v3.advisor.knowledge_coverage import compute_coverage, compute_freshness
-
-    customers = list_customer_summaries()
-    coverages = [compute_coverage(c["customer_id"]) for c in customers]
-    coverages = [c for c in coverages if c]
-    avg_coverage = round(sum(c["coverage_percent"] for c in coverages) / len(coverages)) if coverages else None
-
-    freshness_rows = [compute_freshness(c["customer_id"]) for c in customers]
-    freshness_rows = [f for f in freshness_rows if f]
-    total_stale = sum(f["stale_count"] for f in freshness_rows)
-    total_current = sum(f["current_count"] for f in freshness_rows)
-    freshness_pct = (
-        round(100 * total_current / (total_stale + total_current)) if (total_stale + total_current) else None
-    )
-
-    # A per-customer Qdrant call for every dashboard load would be
-    # expensive; count captured Conversation nodes in Neo4j instead —
-    # the same interaction volume, cheaper to query.
+    from backend_v3.advisor.knowledge_coverage import FRESHNESS_STALE_DAYS
     from backend_v3.graph_store.neo4j_client import run_query
 
-    interaction_rows = run_query("MATCH (:Customer)-[:HAD_CONVERSATION]->(conv:Conversation) RETURN count(conv) AS n", {})
-    needs_rows = run_query("MATCH (:Customer)-[:HAS_NEED]->(:Need) RETURN count(*) AS n", {})
-    events_rows = run_query("MATCH (:Customer)-[:EXPERIENCED]->(:LifeEvent) RETURN count(*) AS n", {})
+    customers = list_customer_summaries()
+
+    coverage_rows = run_query(
+        "MATCH (c:Customer) "
+        "OPTIONAL MATCH (c)-[:HAS_FAMILY_MEMBER]->(fam) "
+        "OPTIONAL MATCH (c)-[:HAS_GOAL]->(g) "
+        "OPTIONAL MATCH (c)-[:HAS_NEED]->(n) "
+        "OPTIONAL MATCH (c)-[:OWNS]->(p) "
+        "OPTIONAL MATCH (c)-[:DISCUSSED]->(t) "
+        "OPTIONAL MATCH (c)-[:EXPERIENCED]->(e) "
+        "OPTIONAL MATCH (c)-[:HAD_MEETING]->(m) "
+        "OPTIONAL MATCH (c)-[:HAD_CONVERSATION]->(conv) "
+        "RETURN c.customer_id AS customer_id, c.life_stage AS life_stage, "
+        "count(DISTINCT fam) AS family_n, count(DISTINCT g) AS goals_n, "
+        "count(DISTINCT n) AS needs_n, count(DISTINCT p) AS policy_n, "
+        "count(DISTINCT t) AS topic_n, count(DISTINCT e) AS event_n, "
+        "count(DISTINCT m) AS meeting_n, count(DISTINCT conv) AS conversation_n",
+        {},
+    )
+
+    coverage_percents = []
+    total_needs = 0
+    total_events = 0
+    total_conversations = 0
+    for row in coverage_rows:
+        present = [
+            True,  # Profile — the customer exists
+            bool(row["family_n"]),
+            bool(row["life_stage"]),
+            bool(row["policy_n"]),  # Financial
+            bool(row["goals_n"]),
+            bool(row["needs_n"]),
+            bool(row["topic_n"]),  # Preferences
+            bool(row["event_n"]),  # Recent events
+            bool(row["meeting_n"]) or bool(row["conversation_n"]),  # Relationship history
+        ]
+        coverage_percents.append(round(100 * sum(present) / len(present)))
+        total_needs += row["needs_n"]
+        total_events += row["event_n"]
+        total_conversations += row["conversation_n"]
+
+    avg_coverage = round(sum(coverage_percents) / len(coverage_percents)) if coverage_percents else None
+
+    freshness_rows = run_query(
+        "MATCH (:Customer)-[r]->(n) "
+        "WHERE type(r) IN ['HAS_GOAL','HAS_NEED','EXPERIENCED','CONCERNED_ABOUT','HAS_FAMILY_MEMBER'] "
+        "  AND r.created_at IS NOT NULL "
+        "RETURN r.created_at AS created_at",
+        {},
+    )
+    from backend_v3.advisor.knowledge_coverage import _months_ago
+
+    stale = current = 0
+    for row in freshness_rows:
+        months = _months_ago(row["created_at"])
+        if months is None:
+            continue
+        if months * 30 >= FRESHNESS_STALE_DAYS:
+            stale += 1
+        else:
+            current += 1
+    freshness_pct = round(100 * current / (stale + current)) if (stale + current) else None
 
     return {
         "average_knowledge_coverage_percent": avg_coverage,
         "average_memory_freshness_percent": freshness_pct,
-        "total_conversations_captured": interaction_rows[0]["n"] if interaction_rows else 0,
-        "total_needs_identified": needs_rows[0]["n"] if needs_rows else 0,
-        "total_life_events_recorded": events_rows[0]["n"] if events_rows else 0,
+        "total_conversations_captured": total_conversations,
+        "total_needs_identified": total_needs,
+        "total_life_events_recorded": total_events,
         "customers_total": len(customers),
     }
 

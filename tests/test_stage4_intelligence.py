@@ -212,6 +212,44 @@ def test_kpi_dashboard_covers_all_five_categories():
     assert set(body.keys()) == {"agent", "customer", "ai", "business", "guardrails"}
 
 
+def test_kpi_dashboard_responds_quickly():
+    """The customer-KPI aggregate used to call compute_coverage() and
+    compute_freshness() once per customer — each doing several Neo4j
+    round trips plus a Qdrant search and DuckDB calls — making the whole
+    dashboard take 15-25s for 20 customers. It now runs two bulk Cypher
+    queries regardless of customer count; this guards against that
+    regressing back into an N+1 pattern."""
+    import time
+
+    start = time.monotonic()
+    res = client.get("/api/v3/advisor/kpis")
+    elapsed = time.monotonic() - start
+
+    assert res.status_code == 200
+    assert elapsed < 5, f"KPI dashboard took {elapsed:.1f}s — expected a handful of bulk queries, not O(customers)"
+
+
+def test_bulk_customer_kpis_match_authoritative_per_customer_values():
+    """The fast aggregate path must agree with the slower, authoritative
+    per-customer computation it replaced for the loop — otherwise the
+    dashboard would be fast but wrong."""
+    from backend_v3.advisor.customer_service import list_customer_summaries
+    from backend_v3.advisor.knowledge_coverage import compute_coverage
+    from backend_v3.advisor.kpi_service import get_kpi_dashboard
+
+    customers = list_customer_summaries()
+    authoritative = [compute_coverage(c["customer_id"]) for c in customers]
+    authoritative = [c for c in authoritative if c]
+    expected_avg = round(sum(c["coverage_percent"] for c in authoritative) / len(authoritative))
+
+    dashboard = get_kpi_dashboard()
+    # Financial coverage in the bulk path checks policy *presence* via
+    # :OWNS rather than the DuckDB-joined portfolio the authoritative
+    # path uses, so allow a small tolerance rather than requiring an
+    # exact match on live, mutating demo data.
+    assert abs(dashboard["customer"]["average_knowledge_coverage_percent"] - expected_avg) <= 5
+
+
 def test_unmeasurable_kpis_are_null_with_a_reason_not_fabricated():
     """A metric this product genuinely cannot compute yet (e.g. customer
     complaints — no intake exists) must say so, not return a plausible
