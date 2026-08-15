@@ -2,58 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  BarChart3,
-  CalendarDays,
-  CheckSquare,
-  FileText,
-  GitBranch,
-  LayoutDashboard,
-  Lightbulb,
-  Link2,
-  MessageSquareText,
-  Settings,
-  ShieldCheck,
-  Sparkles,
-  Users
-} from "lucide-react";
-
-interface NavItem {
-  href: string;
-  label: string;
-  icon: typeof LayoutDashboard;
-}
-
-const SECTIONS: { title: string | null; items: NavItem[] }[] = [
-  {
-    title: "Advisor workspace",
-    items: [
-      { href: "/advisor", label: "My Day", icon: CalendarDays },
-      { href: "/advisor/insights", label: "Insights", icon: Lightbulb },
-      { href: "/advisor/customers", label: "Customers", icon: Users },
-      { href: "/advisor/conversations", label: "Conversations", icon: MessageSquareText },
-      { href: "/advisor/tasks", label: "Tasks", icon: CheckSquare },
-      { href: "/advisor/connections", label: "Connections", icon: Link2 },
-      { href: "/advisor/kpis", label: "KPI Dashboard", icon: BarChart3 },
-      { href: "/advisor/audit", label: "AI Auditability", icon: ShieldCheck },
-      { href: "/advisor/settings", label: "Profile / Settings", icon: Settings }
-    ]
-  },
-  {
-    title: "Platform",
-    items: [
-      { href: "/", label: "Overview", icon: LayoutDashboard },
-      { href: "/context-graph", label: "Context Graph", icon: GitBranch },
-      { href: "/claims", label: "Claims", icon: FileText }
-    ]
-  }
-];
-
-function isActive(pathname: string, href: string): boolean {
-  if (href === "/") return pathname === "/";
-  if (href === "/advisor") return pathname === "/advisor";
-  return pathname.startsWith(href);
-}
+import { Sparkles } from "lucide-react";
+import { NAV_SECTIONS, isNavItemActive } from "./navSections";
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -73,13 +23,13 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-5 thin-scroll">
-        {SECTIONS.map((section, i) => (
+        {NAV_SECTIONS.map((section, i) => (
           <div key={section.title || `section-${i}`} className={i > 0 ? "pt-4" : ""}>
             {section.title && (
               <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500">{section.title}</p>
             )}
             {section.items.map((item) => {
-              const active = isActive(pathname, item.href);
+              const active = isNavItemActive(pathname, item.href);
               const Icon = item.icon;
               return (
                 <Link
