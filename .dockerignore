@@ -1,0 +1,22 @@
+# The image bakes in database/insurance_v3.duckdb, so `COPY database/` would
+# otherwise drag every sibling file in with it -- including ~500MB of local
+# backups, which doubles image size, build time and Cloud Run cold start for
+# nothing.
+database/*.bak-*
+database/*.duckdb.wal
+database/*.duckdb.tmp
+
+# Never ship local env or tooling into the image.
+.env
+.env.*
+venv/
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.git/
+.claude/
+frontend_v3/
+tests/
+docs/
