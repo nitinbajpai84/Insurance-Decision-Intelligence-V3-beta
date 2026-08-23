@@ -137,6 +137,7 @@ def _mark_prepared(customer_id: str) -> None:
     try:
         from datetime import datetime, timezone
 
+        from backend_v3.advisor.prioritization import TODAY
         from backend_v3.graph_store.neo4j_client import run_write
 
         run_write(
@@ -144,7 +145,12 @@ def _mark_prepared(customer_id: str) -> None:
             "SET c.last_prepared_date = $today, c.last_prepared_at = $now",
             {
                 "customer_id": customer_id,
-                "today": datetime.now(timezone.utc).date().isoformat(),
+                # Must be prioritization.TODAY, not the wall-clock date: that is
+                # the constant meeting_service filters "requiring preparation"
+                # against. Writing the real date here meant the two only agreed
+                # while wall-clock happened to match the pinned demo date, and
+                # silently stopped agreeing the day it moved past it.
+                "today": TODAY.isoformat(),
                 "now": datetime.now(timezone.utc).isoformat(),
             },
         )
