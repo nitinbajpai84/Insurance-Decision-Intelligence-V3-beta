@@ -8,10 +8,12 @@ import {
   Lightbulb,
   Link2,
   MessageSquareText,
+  Repeat,
   Scale,
   Settings,
   ShieldCheck,
   Stethoscope,
+  TrendingUp,
   Users
 } from "lucide-react";
 
@@ -39,7 +41,9 @@ export const NAV_SECTIONS: { title: string | null; items: NavItem[] }[] = [
     title: "Risk chain",
     items: [
       { href: "/underwriting", label: "Underwriting", icon: Stethoscope },
-      { href: "/claims/triage", label: "Claims", icon: FileText }
+      { href: "/experience", label: "Pricing & Experience", icon: TrendingUp },
+      { href: "/claims/triage", label: "Claims", icon: FileText },
+      { href: "/feedback-loop", label: "Claims → Underwriting", icon: Repeat }
     ]
   },
   {
