@@ -57,6 +57,20 @@ order by indicator_date desc
 """
 
 
+@router.get("/claims/triage")
+def claims_triage(limit: int = 100):
+    """
+    Open claims ordered by how much attention they need, each with its reasons.
+
+    Declared before /claims/{claim_id} on purpose -- FastAPI matches in
+    definition order, so the dynamic route would otherwise swallow "triage" as
+    a claim id.
+    """
+    from backend_v3.risk.claims_triage import triage_open_claims, triage_summary
+
+    return {"summary": triage_summary(), "claims": triage_open_claims(limit=limit)}
+
+
 @router.get("/claims")
 def list_claims(limit: int = 50):
     con = get_connection()

@@ -39,7 +39,7 @@ export const NAV_SECTIONS: { title: string | null; items: NavItem[] }[] = [
     title: "Risk chain",
     items: [
       { href: "/underwriting", label: "Underwriting", icon: Stethoscope },
-      { href: "/claims", label: "Claims", icon: FileText }
+      { href: "/claims/triage", label: "Claims", icon: FileText }
     ]
   },
   {
@@ -67,5 +67,8 @@ export function isNavItemActive(pathname: string, href: string): boolean {
   // "Underwriting" must not light up while the reader is on the Rules screen,
   // which lives beneath it but is a separate destination in the nav.
   if (href === "/underwriting") return pathname === "/underwriting" || pathname.startsWith("/underwriting/cases");
+  // Claims points at the triage queue, but the register and claim detail sit at
+  // /claims/* and should still keep the nav item lit rather than orphaning it.
+  if (href === "/claims/triage") return pathname.startsWith("/claims");
   return pathname.startsWith(href);
 }
