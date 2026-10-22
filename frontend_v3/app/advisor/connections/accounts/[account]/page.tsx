@@ -290,7 +290,7 @@ export default function AccountSetupPage() {
           <button
             onClick={connect}
             disabled={busy !== "" || !account.credentials_configured}
-            className="inline-flex items-center gap-2 rounded-lg bg-v3-teal px-4 py-2 text-sm font-bold text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+            className="inline-flex items-center gap-2 rounded-lg bg-v3-teal px-4 py-2 text-sm font-bold text-white hover:bg-v3-violetDark disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
             title={account.credentials_configured ? "" : "Save credentials first"}
           >
             {busy === "connect"

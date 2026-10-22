@@ -6,9 +6,9 @@ html,
 body {
   padding: 0;
   margin: 0;
-  background: #f4f3f8;
-  color: #1e1b2e;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: #F3F5F6;
+  color: #14232B;
+  font-family: 'DM Sans', system-ui, sans-serif;
 }
 
 * {
@@ -20,9 +20,20 @@ body {
   height: 8px;
 }
 .thin-scroll::-webkit-scrollbar-thumb {
-  background: #d1cfe0;
+  background: #D5DEE2;
   border-radius: 9999px;
 }
 .thin-scroll::-webkit-scrollbar-track {
   background: transparent;
+}
+
+.display {
+  font-family: 'Fraunces', Georgia, serif;
+}
+.eyebrow {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #0F6B6B;
+  font-weight: 700;
 }

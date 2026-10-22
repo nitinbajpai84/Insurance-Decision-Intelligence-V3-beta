@@ -186,7 +186,7 @@ export default function CrmSetupPage() {
             <button
               onClick={connect}
               disabled={busy !== "" || !vendor.credentials_configured}
-              className="rounded-lg bg-v3-teal px-4 py-2 text-sm font-bold text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+              className="rounded-lg bg-v3-teal px-4 py-2 text-sm font-bold text-white hover:bg-v3-violetDark disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
             >
               {busy === "connect" ? "Connecting..." : "Connect"}
             </button>

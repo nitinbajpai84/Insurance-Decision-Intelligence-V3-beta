@@ -7,10 +7,10 @@ import { api, type GraphLink, type GraphNode } from "@/services/api";
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
 
 const TYPE_COLOR: Record<string, string> = {
-  Claim: "#7C3AED",
-  Document: "#0D9488",
-  Party: "#D97706",
-  Flag: "#DC2626"
+  Claim: "#0F6B6B",
+  Document: "#052A52",
+  Party: "#A35F00",
+  Flag: "#B4436C"
 };
 
 export default function ContextGraphPage() {
@@ -46,7 +46,7 @@ export default function ContextGraphPage() {
             nodeLabel={(n: any) => `${n.type}: ${n.label}`}
             nodeColor={(n: any) => TYPE_COLOR[n.type] || "#9CA3AF"}
             linkLabel={(l: any) => l.type}
-            linkColor={() => "#D1CFE0"}
+            linkColor={() => "#D5DEE2"}
             nodeRelSize={5}
           />
         )}

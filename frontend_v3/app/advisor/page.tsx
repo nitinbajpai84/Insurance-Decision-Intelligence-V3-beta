@@ -42,8 +42,8 @@ export default function MyDayPage() {
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-v3-violet">My Day</p>
-          <h1 className="mt-1 text-2xl font-bold text-gray-900">Today&apos;s advisor workspace</h1>
+          <p className="eyebrow">My Day</p>
+          <h1 className="display mt-1 text-2xl font-bold text-gray-900">Today&apos;s advisor workspace</h1>
           <p className="mt-1 max-w-2xl text-sm text-gray-500">Onboard, connect, prepare, meet, capture, remember, and act from one daily view.</p>
         </div>
         <button onClick={load} className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:border-v3-violet hover:text-v3-violet">
@@ -58,7 +58,7 @@ export default function MyDayPage() {
               <p className="text-sm font-bold text-gray-900">Finish your advisor setup</p>
               <p className="mt-1 text-sm text-gray-500">Set your profile, choose data sources, and review the initial customer import result.</p>
             </div>
-            <Link href="/advisor/onboarding" className="inline-flex items-center gap-2 rounded-lg bg-v3-teal px-3 py-2 text-sm font-bold text-white hover:bg-teal-700">
+            <Link href="/advisor/onboarding" className="inline-flex items-center gap-2 rounded-lg bg-v3-teal px-3 py-2 text-sm font-bold text-white hover:bg-v3-violetDark">
               Continue onboarding <ArrowRight size={15} />
             </Link>
           </div>
@@ -340,7 +340,7 @@ function StatCard({ label, value, icon }: { label: string; value: number; icon: 
         <p className="text-xs font-bold uppercase tracking-wide text-gray-400">{label}</p>
         {icon}
       </div>
-      <p className="mt-1 text-2xl font-bold text-gray-900">{value}</p>
+      <p className="display mt-1 text-2xl font-bold text-gray-900">{value}</p>
     </div>
   );
 }

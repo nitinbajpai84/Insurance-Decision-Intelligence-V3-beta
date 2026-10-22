@@ -82,7 +82,7 @@ export default function OnboardingPage() {
               Continue <ArrowRight size={15} />
             </button>
           ) : (
-            <Link href="/advisor" onClick={finish} className="inline-flex items-center gap-2 rounded-lg bg-v3-teal px-4 py-2 text-sm font-bold text-white hover:bg-teal-700">
+            <Link href="/advisor" onClick={finish} className="inline-flex items-center gap-2 rounded-lg bg-v3-teal px-4 py-2 text-sm font-bold text-white hover:bg-v3-violetDark">
               Finish setup <Check size={15} />
             </Link>
           )}

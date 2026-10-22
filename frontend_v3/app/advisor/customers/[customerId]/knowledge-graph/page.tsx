@@ -9,14 +9,14 @@ import { intelligenceApi, type CustomerKnowledgeGraph, type KnowledgeGraphNode }
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
 
 const TYPE_COLOR: Record<string, string> = {
-  Customer: "#7C3AED",
-  FamilyMember: "#D97706",
-  LifeEvent: "#DC2626",
-  Goal: "#0D9488",
-  Need: "#2563EB",
-  Policy: "#059669",
-  Conversation: "#9333EA",
-  Topic: "#EA580C"
+  Customer: "#0F6B6B",
+  FamilyMember: "#A35F00",
+  LifeEvent: "#B4436C",
+  Goal: "#052A52",
+  Need: "#6B3FA0",
+  Policy: "#2F7D4F",
+  Conversation: "#5B6773",
+  Topic: "#D98E2B"
 };
 
 export default function CustomerKnowledgeGraphPage({ params }: { params: Promise<{ customerId: string }> }) {
